@@ -1,3 +1,4 @@
+import os
 import networkx as nx
 import numpy as np
 from math import log,exp
@@ -41,10 +42,22 @@ def GetDistNet(path,code):
     if type(code) == list:
         graph = nx.Graph()
         for c in code:
-            g = nx.read_gpickle(path+str(c)+'-dist-net.gpickle')
+            net_file = f"{path}/{c}-dist-net.gpickle"
+            if not os.path.exists(net_file):
+                raise ValueError(f"{net_file} doesn't exist!")
+            g = nx.read_gpickle(net_file)
             graph = nx.compose(graph,g)
+            for n in graph:
+                graph.nodes[n]["reach"] = nx.shortest_path_length(
+                    graph, n, c, 'length')
     else:
-        graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')
+        net_file = f"{path}/{code}-dist-net.gpickle"
+        if not os.path.exists(net_file):
+            raise ValueError(f"{net_file} doesn't exist!")
+        graph = nx.read_gpickle(net_file)
+        for n in graph:
+            graph.nodes[n]["reach"] = nx.shortest_path_length(
+                graph, n, code, 'length')
     return graph
 
 
@@ -62,6 +75,8 @@ def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25,
                     if synth_graph.nodes[n]['label']==label \
                         or synth_graph.nodes[n]['label'] in label]
     # Get the dataframe for node and edge geometries
+    if len(nodelist) == 0:
+        return
     d = {'nodes':nodelist,
          'geometry':[Point(synth_graph.nodes[n]['cord']) for n in nodelist]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
@@ -79,17 +94,56 @@ def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,
         edgelist = [e for e in synth_graph.edges() \
                     if synth_graph[e[0]][e[1]]['label']==label\
                         or synth_graph[e[0]][e[1]]['label'] in label]
+    if len(edgelist) == 0:
+        return
     d = {'edges':edgelist,
          'geometry':[synth_graph.edges[e]['geometry'] for e in edgelist]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
     df_edges.plot(ax=ax,edgecolor=color,linewidth=width,linestyle=style,alpha=alpha)
     return
 
-def plot_network(net,path=None):
+def draw_polygons(ax, polygons, color='red', alpha=1.0, label=None):
+    if len(polygons) == 0:
+        return ax
+    if isinstance(polygons, list):
+        d = {'nodes': range(len(polygons)),
+             'geometry': [geom for geom in polygons]}
+    elif isinstance(polygons, dict):
+        d = {'nodes': range(len(polygons)),
+             'geometry': [polygons[k] for k in polygons]}
+    df_polygons = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_polygons.plot(ax=ax, facecolor=color, alpha=alpha, label=label)
+    return ax
+
+def highlight_regions(geom_regions, ax,  **kwargs):
+    # Index for highlight among the regions
+    highlight = kwargs.get('region_highlight', None)
+    highlight = kwargs.get('highlight', highlight)
+    
+    # Transparency level
+    alpha = kwargs.get('alpha', 0.2)
+    
+    # region color and highlight color
+    plot_colors = dict(
+        region=kwargs.get('region_color', 'cyan'),
+        highlight=kwargs.get('highlight_color', 'orange')
+    )
+    
+    # highlight one region whose index is passed
+    if highlight is not None:
+        geom_regions = geom_regions[:]
+        region = geom_regions.pop(highlight)
+        draw_polygons(ax, [region], color=plot_colors['highlight'], 
+                      alpha=alpha)
+    
+    # show the other regions
+    draw_polygons(ax, geom_regions, color=plot_colors['region'], alpha=alpha)
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    return ax
+
+def plot_network(net, ax, **kwargs):
     """
     """
-    fig = plt.figure(figsize=(40,40), dpi=72)
-    ax = fig.add_subplot(111)
     # Draw nodes
     DrawNodes(net,ax,label='S',color='dodgerblue',size=2000)
     DrawNodes(net,ax,label='T',color='green',size=25)
@@ -115,15 +169,17 @@ def plot_network(net,path=None):
                    marker='o',markersize=20,label='transformer'),
                 Line2D([0], [0], color='white', markerfacecolor='dodgerblue', 
                    marker='o',markersize=20,label='substation'),
-                Line2D([0], [0], color='white', markerfacecolor='peru', 
-                   marker='o',markersize=20,label="EV charging station"),
                Line2D([0], [0], color='white', markerfacecolor='red', 
                    marker='o',markersize=20,label='residence')]
+    # If EV charging station present add the legend
+    if len([n for n in net if net.nodes[n]['label']=='E']) != 0:
+        leghands.append(
+            Line2D([0], [0], color='white', markerfacecolor='peru', 
+               marker='o',markersize=20,label="EV charging station")
+            )
     
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
     ax.legend(handles=leghands,loc='best',ncol=1,prop={'size': 25})
-    if path != None: 
-        fig.savefig("{}{}.png".format(path,'-51121-dist'),bbox_inches='tight')
     return
 
 
