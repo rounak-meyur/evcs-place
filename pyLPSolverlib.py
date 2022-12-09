@@ -72,7 +72,7 @@ def construct_dummy(synt_net, candidate_edges, evcs):
 
 
 def get_optimal_routing(synt_net, candidate_edges, evcs, 
-                        path, v0=1.0):
+                        path, v0=1.0, lambda_=1e3):
     graph = construct_dummy(synt_net, candidate_edges, evcs)
     edgelist = list(graph.edges)
     nodelist = list(graph.nodes)
@@ -101,7 +101,7 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     
     model = grb.Model(name="Get Routing")
     model.ModelSense = grb.GRB.MINIMIZE
-    model.write(f"{path}/routing.mps")
+    model.write(f"{path}/routing.lp")
     
     x = model.addMVar(
         n_edges, 
@@ -154,10 +154,8 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     
     # Objective function
     model.addConstr( w == 1.0 - v )
-    # model.addConstr( y == w @ w )
-    
-    # model.setObjective( (l @ x) )
-    model.setObjective( (l @ x) + y )
+    model.addConstr( y >= (w @ w) )
+    model.setObjective( 1e-3 * (l @ x) + (lambda_ * y) )
     model.update()
     
     # Turn off display and heuristics
@@ -165,7 +163,7 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     grb.setParam('Heuristics', 0)
     
     # Open log file
-    logfile = open(f'{path}/gurobi.log', 'w')
+    logfile = open(f'{path}/evcs.log', 'w')
     
     # Pass data into my callback function
     # model.params.NonConvex = 2
@@ -175,23 +173,18 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     model._vars = model.getVars()
     
     # Solve model and capture solution information
-    model.optimize()
     # model.optimize(mycallback)
+    model.optimize()
     
     # Close log file
     logfile.close()
-    
-    print('Optimization complete')
-    
     
     if model.SolCount == 0:
         print(f'No solution found, optimization status = {model.Status}')
         sys.exit(0)
     else:
-        print(f'Solution found, objective = {model.ObjVal : g}')
         x_optimal = x.getAttr("x").tolist()
         optimal_edges = [e for i,e in enumerate(edgelist) if x_optimal[i]>0.8]
-        
         # get new edges
         new_edges = [e for e in optimal_edges \
                      if e in candidate_edges or (e[1],e[0]) in candidate_edges]

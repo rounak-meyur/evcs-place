@@ -8,12 +8,15 @@ Description: Contains methods and classes to connect EV charging stations to
 the existing distribution network
 """
 
+import warnings
+warnings.filterwarnings("ignore")
+
 import os
 import unittest
 import matplotlib
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
-from datetime import timedelta
+from tqdm import tqdm
 
 import csv
 import pandas as pd
@@ -68,6 +71,7 @@ class EVCSFixture(unittest.TestCase):
         self.evloc_path = "./input/ev-loc"
         self._out_dir = "out"
         self._fig_dir = "figs"
+        self._grb_dir = "gurobi"
 
         self.evfilename = {
             'existing': 'ev-stations',
@@ -99,6 +103,17 @@ class EVCSFixture(unittest.TestCase):
         self._fig_dir = fig
         if not os.path.exists(self.fig_dir):
             os.makedirs(self.fig_dir)
+        pass
+    
+    @property
+    def grb_dir(self):
+        return self._grb_dir
+
+    @grb_dir.setter
+    def grb_dir(self, grb):
+        self._grb_dir = grb
+        if not os.path.exists(self.grb_dir):
+            os.makedirs(self.grb_dir)
         pass
     
     def read_synthetic_network(self, codes=list(), area=None, hull=None):
@@ -191,7 +206,7 @@ class EVCSFixture(unittest.TestCase):
         return add_edges
     
     @staticmethod
-    def connect_optimal_road(net, points, path, epsilon=5e-3):
+    def connect_optimal_road(net, points, path, epsilon=5e-3, lambda_=1e3):
         # Get candidate edges
         candidates = []
         distance = []
@@ -204,7 +219,7 @@ class EVCSFixture(unittest.TestCase):
         
         # Solve optimization problem to get the best candidate
         add_edges = get_optimal_routing(
-            net, dict(zip(candidates,distance)), points, path)
+            net, dict(zip(candidates,distance)), points, path, lambda_=lambda_)
         return add_edges
     
     @staticmethod
@@ -214,9 +229,10 @@ class EVCSFixture(unittest.TestCase):
         
         # add node attributes
         for node in new_nodes.cord:
-            net.nodes[node]["cord"] = new_nodes.cord[node]
-            net.nodes[node]["label"] = "E"
-            net.nodes[node]["load"] = new_nodes.demand[node]
+            if node in net:
+                net.nodes[node]["cord"] = new_nodes.cord[node]
+                net.nodes[node]["label"] = "E"
+                net.nodes[node]["load"] = new_nodes.demand[node]
         
         # add edge attributes
         for edge in new_edges:
@@ -239,35 +255,27 @@ class EVCSFixture(unittest.TestCase):
                 raise ValueError(f"{edge} does not have an EVCS node")
         return
     
-    def connect_evcs(self, synth_net=None, evcs=None, 
+    def connect_evcs(self, synth_net, evcs, 
                      connection = "nearest", **kwargs):
-        if not synth_net: 
-            if not evcs:
-                synth_net, evcs = self.read_inputs()
-            else:
-                synth_net = self.read_synthetic_network()
-        else:
-            if not evcs:
-                evcs = self.read_fuel_data_near_network(synth_net)
-        
         # Check if EVCS exists
         if len(evcs.cord)==0:
             print("No EV charging station exists within region")
             return synth_net
         
         eps = kwargs.get("epsilon", 5e-3)
+        lambda_ = kwargs.get("lambda_", 1e3)
+        
         if connection == "nearest":
             new_edges = self.connect_nearest_road(synth_net, evcs, epsilon=eps)
         
         elif connection == "optimal":
             new_edges = self.connect_optimal_road(
-                synth_net, evcs, self._out_dir, epsilon=eps)
+                synth_net, evcs, self.grb_dir, epsilon=eps, lambda_=lambda_)
             
         else:
             raise ValueError(f"{connection} is invalid connection algorithm specifier")
         
         # Add the attributes
-        print(new_edges)
         self.add_attributes(synth_net, new_edges, evcs)
         return synth_net
     
@@ -328,10 +336,6 @@ class EVCSFixture(unittest.TestCase):
         plot_network(synth_net, ax, **kwargs)
         
         # ---- Edit the title of the plot ----
-        title = f"${self.area}$"
-        if title_sfx := kwargs.get('title_sfx'):
-            title = f"{title} : {title_sfx}"
-        ax.set_title(title, fontsize=fontsize)
 
         if file_name_sfx := kwargs.get('file_name_sfx'):
             if not to_file:
@@ -340,7 +344,7 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"{to_file}"
+            suptitle = f"${self.area}$"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
@@ -371,10 +375,6 @@ class EVCSFixture(unittest.TestCase):
         highlight_regions(region_list, ax, **kwargs)
         
         # ---- Edit the title of the plot ----
-        title = f"${self.area}$"
-        if title_sfx := kwargs.get('title_sfx'):
-            title = f"{title} : {title_sfx}"
-        ax.set_title(title, fontsize=fontsize)
 
         if file_name_sfx := kwargs.get('file_name_sfx'):
             if not to_file:
@@ -383,7 +383,52 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"{to_file}"
+            suptitle = f"${self.area}$"
+            if suptitle_sfx := kwargs.get('suptitle_sfx'):
+                suptitle = f"{suptitle} : {suptitle_sfx}"
+
+            fig.suptitle(suptitle, fontsize=fontsize+3)
+            close_fig(fig, to_file, show)
+
+        if do_return:
+            return fig, ax
+        pass
+    
+    def plot_dependence(
+            self, csv_file = None, df_data=None, area=None,
+            ax=None, to_file=None, show=True,
+            **kwargs
+            ):
+        kwargs.setdefault('figsize', (10, 10))
+        fontsize = kwargs.get('fontsize', 20)
+        do_return = kwargs.get('do_return', False)
+        if not area:
+            area = self.area
+            
+        if csv_file:
+            df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
+
+        # ---- PLOT ----
+        fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
+        cols = list(df_data.columns)
+        ax.plot(df_data[cols[0]], df_data[cols[1]], 
+                marker="o",color='red',linestyle='solid', linewidth=1.0)
+        if cols[0] == 'demand':
+            ax.set_xlabel("Power demand (in kW)", fontsize=fontsize)
+        elif cols[1] == 'lambda':
+            ax.set_xlabel("Weight factor in objective function", fontsize=fontsize)
+        ax.set_ylabel("Additional length (in meters)", fontsize=fontsize)
+        
+        # ---- Edit the title of the plot ----
+
+        if file_name_sfx := kwargs.get('file_name_sfx'):
+            if not to_file:
+                to_file = f"{area}"
+            to_file = f"{to_file}_{file_name_sfx}"
+
+        if no_ax:
+            to_file = f"{self.fig_dir}/{to_file}.png"
+            suptitle = f"${self.area}$"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
@@ -404,7 +449,8 @@ class EVCSRuns_Montgomery(EVCSFixture):
         super().__init__(methodName)
         self.out_dir = "out/script"
         self.fig_dir = "figs/script"
-        self.area = None
+        self.grb_dir = "gurobi/script"
+        self.area = "Area 2"
         self.evcsdataID = None
         self.demand = 0.001
         return
@@ -417,7 +463,6 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     self.assertIsNotNone(synth_net)
 
     #     # plot network
-    #     self.fig_dir = "figs/test"
     #     fig, ax = self.plot_synth_net(
     #         synth_net, self.area,
     #         file_name_sfx="synth_net",
@@ -449,7 +494,6 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     self.assertIsNotNone(evcs_data.demand)
         
     #     # plot network
-    #     self.fig_dir = "figs/test"
     #     fig, ax = self.plot_synth_net(
     #         synth_net, self.area,
     #         title_sfx = "Synthetic power distribution network", fontsize=30,
@@ -479,7 +523,6 @@ class EVCSRuns_Montgomery(EVCSFixture):
         
         
     #     # plot network
-    #     self.fig_dir = "figs/test"
     #     fig, ax = self.plot_synth_net(
     #         synth_net, self.area,
     #         title_sfx = "Power distribution network with EVCS connected to nearest point",
@@ -490,26 +533,131 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     self.assertIsNotNone(ax)
     #     pass
     
-    def test_connect_evcs_optimal(self):
+    # def test_connect_evcs_optimal(self):
+    #     self.evcsdataID = 'existing'
+    #     self.area = 'Area 2'
+    #     self.demand = 1800
+    #     self.connection = 'optimal'
+        
+    #     synth_net, evcs = self.read_inputs()
+    #     self.assertIsNotNone(synth_net)
+    #     self.assertIsNotNone(evcs)
+    #     self.assertIsNotNone(evcs.cord)
+    #     self.assertIsNotNone(evcs.demand)
+        
+    #     synth_net = self.connect_evcs(
+    #         synth_net, evcs, 
+    #         connection=self.connection,
+    #         lambda_ = 1e3, 
+    #         epsilon=1e-2,)
+    #     self.assertIsNotNone(synth_net)
+        
+    #     plot network
+    #     fig, ax = self.plot_synth_net(
+    #         synth_net,
+    #         suptitle_sfx = f"EVCS connected to {self.connection} point : {self.demand}kW",
+    #         file_name_sfx = f"synth_net_evcs_{self.demand}kw_{self.connection}", 
+    #         fontsize=30,
+    #         do_return=True
+    #     )
+    #     self.assertIsNotNone(fig)
+    #     self.assertIsNotNone(ax)
+    #     pass
+    
+    def test_demand_dependence(self):
         self.evcsdataID = 'existing'
         self.area = 'Area 2'
-        self.demand = 2400
         
         
-        synth_net = self.connect_evcs(connection='optimal', epsilon=1e-2)
-        self.assertIsNotNone(synth_net)
+        data_demand = {"demand":[], "length":[]}
+        lambda_ = 1000000
         
-        # plot network
-        self.fig_dir = "figs/test"
-        fig, ax = self.plot_synth_net(
-            synth_net, self.area,
-            title_sfx = f"Network with EVCS connected to optimal point : {self.demand}kW",
-            file_name_sfx = f"synth_net_evcs_{self.demand}kw", fontsize=30,
+        for demand in tqdm(range(150,10500,150), 
+                      ncols=100, desc="simulate for multiple weights"):
+            self.demand = demand
+            synth_net, evcs = self.read_inputs()
+            init_length = sum([synth_net.edges[e]["length"] \
+                                for e in synth_net.edges])
+            synth_net = self.connect_evcs(
+                synth_net, evcs, 
+                connection='optimal',
+                lambda_ = lambda_, 
+                epsilon=1e-1,)
+            final_length = sum([synth_net.edges[e]["length"] \
+                                for e in synth_net.edges])
+            
+            # Evaluate the additional length
+            add_length = final_length - init_length
+            
+            # Add it to the data
+            data_demand["demand"].append(demand)
+            data_demand["length"].append(add_length)
+        
+        # Create the dataframe
+        df = pd.DataFrame(data_demand)
+        df.to_csv(f"{self.out_dir}/demand_lamb_{lambda_}.csv", index=False)
+        
+        # Plot the dependence
+        fig, ax = self.plot_dependence(
+            df_data=df,
+            suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
+            file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
+            fontsize=20,
             do_return=True
         )
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
+        
         pass
+    
+    # def test_plot_dependence(self):
+    #     lambda_ = 1000000
+    #     fig, ax = self.plot_dependence(
+    #         csv_file = f"demand_lamb_{lambda_}.csv",
+    #         suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
+    #         file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
+    #         fontsize=30,
+    #         do_return=True
+    #     )
+    #     self.assertIsNotNone(fig)
+    #     self.assertIsNotNone(ax)
+    #     pass
+    
+    # def test_lambda_optimal_dependence(self):
+    #     self.evcsdataID = 'existing'
+    #     self.area = 'Area 2'
+    #     self.demand = 2000
+        
+    #     synth_net, evcs = self.read_inputs()
+    #     init_length = sum([synth_net.edges[e]["length"] \
+    #                        for e in synth_net.edges])
+        
+    #     data_lambda = {"lambda":[], "length":[]}
+        
+    #     for lambda_ in tqdm(range(0,1000000,50000), 
+    #                   ncols=100, desc="simulate for lambdas"):
+            
+    #         synth_net = self.connect_evcs(
+    #             synth_net, evcs, 
+    #             connection='optimal',
+    #             lambda_ = lambda_, 
+    #             epsilon=1e-1,)
+    #         final_length = sum([synth_net.edges[e]["length"] \
+    #                            for e in synth_net.edges])
+            
+    #         # Evaluate the additional length
+    #         add_length = final_length - init_length
+            
+    #         # Add it to the data
+    #         data_lambda["lambda"].append(lambda_)
+    #         data_lambda["length"].append(add_length)
+        
+    #     # Create the dataframe
+    #     df = pd.DataFrame(data_lambda)
+    #     df.to_csv(f"{self.out_dir}/lambda.csv", index=False)
+    #     return
+            
+            
     
     
     # def test_show_region(self):
