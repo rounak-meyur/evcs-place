@@ -23,6 +23,7 @@ import pandas as pd
 import networkx as nx
 from shapely.geometry import Point, MultiPoint, LineString, base as sg
 from collections import namedtuple as nt
+import seaborn as sns
 
 from pyUtilslib import GetDistNet, geodist, powerflow
 from pyUtilslib import plot_network, highlight_regions
@@ -156,7 +157,7 @@ class EVCSFixture(unittest.TestCase):
         # Rename the fuel station nodes
         evcs_cord = {f'F{i+1}': (fuel[i][0],fuel[i][1]) \
                      for i,data in enumerate(fuel)}
-        evcs_demand = {f'F{i+1}': fuel[i][-1] for i,data in enumerate(fuel)}
+        evcs_demand = {f'F{i+1}': fuel[i][-1] * self.demand for i,data in enumerate(fuel)}
 
         # Store data in named tuple
         evcs = nt('EVCS', field_names=["cord","demand"])
@@ -437,13 +438,16 @@ class EVCSFixture(unittest.TestCase):
 
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
-        cols = list(df_data.columns)
-        ax.plot(df_data[cols[0]], df_data[cols[1]], 
-                marker="o",color='red',linestyle='solid', linewidth=1.0)
-        if cols[0] == 'demand':
-            ax.set_xlabel("Power demand (in kW)", fontsize=fontsize)
-        elif cols[1] == 'lambda':
-            ax.set_xlabel("Weight factor in objective function", fontsize=fontsize)
+        
+        sns.lineplot(df_data, x="rating", y="length", hue="connection", 
+                     )
+        
+        
+        # if cols[0] == 'rating':
+        #     ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
+        # elif cols[1] == 'lambda':
+        #     ax.set_xlabel("Weight factor in objective function", fontsize=fontsize)
+        ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
         ax.set_ylabel("Additional length (in meters)", fontsize=fontsize)
         
         # ---- Edit the title of the plot ----
@@ -469,18 +473,18 @@ class EVCSFixture(unittest.TestCase):
 
 
 
-class EVCSRuns_Montgomery(EVCSFixture):
+# class EVCSRuns_Montgomery(EVCSFixture):
     
     
-    def __init__(self, methodName:str = ...) -> None:
-        super().__init__(methodName)
-        self.out_dir = "out/script"
-        self.fig_dir = "figs/script"
-        self.grb_dir = "gurobi/script"
-        self.area = "Area 2"
-        self.evcsdataID = None
-        self.demand = 0.001
-        return
+    # def __init__(self, methodName:str = ...) -> None:
+    #     super().__init__(methodName)
+    #     self.out_dir = "out/script"
+    #     self.fig_dir = "figs/script"
+    #     self.grb_dir = "gurobi/script"
+    #     self.area = "Area 2"
+    #     self.evcsdataID = None
+    #     self.demand = 3600.0 / 24.0
+    #     return
     
     # def test_read_synthetic_network(self):
     #     self.area = 'Area 1'
@@ -532,12 +536,13 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     pass
     
     # def test_connect_evcs(self):
-    #     self.evcsdataID = 'existing'
+    #     # self.evcsdataID = 'existing'
     #     self.area = 'Area 2'
         
     #     # Test the function
     #     # if no information is available, use default setting
-    #     synth_net = self.connect_evcs()
+    #     synth_net, evcs = self.read_inputs()
+    #     synth_net = self.connect_evcs(synth_net, evcs)
     #     self.assertIsNotNone(synth_net)
         
     #     # if synthetic network is available but not EVCS information
@@ -548,6 +553,11 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     # synth_net = self.connect_evcs(
     #     #     synth_net=synth_net, evcs=evcs_data)
         
+    #     # powerflow
+    #     powerflow(synth_net)
+    #     ev_nodes = [n for n in synth_net if synth_net.nodes[n]['label']=='E']
+    #     print(ev_nodes)
+    #     print([synth_net.nodes[n]["voltage"] for n in ev_nodes])
         
     #     # plot network
     #     fig, ax = self.plot_synth_net(
@@ -561,9 +571,9 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     pass
     
     # def test_connect_evcs_optimal(self):
-    #     self.evcsdataID = 'existing'
+    #     # self.evcsdataID = 'existing'
     #     self.area = 'Area 2'
-    #     self.demand = 1800
+    #     self.demand = 3600.0 / 24.0
     #     self.connection = 'optimal'
         
     #     synth_net, evcs = self.read_inputs()
@@ -576,14 +586,14 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #         synth_net, evcs, 
     #         connection=self.connection,
     #         lambda_ = 1e3, 
-    #         epsilon=1e-2,)
+    #         epsilon = 1e-2,)
     #     self.assertIsNotNone(synth_net)
         
-    #     plot network
+    #     # plot network
     #     fig, ax = self.plot_synth_net(
     #         synth_net,
-    #         suptitle_sfx = f"EVCS connected to {self.connection} point : {self.demand}kW",
-    #         file_name_sfx = f"synth_net_evcs_{self.demand}kw_{self.connection}", 
+    #         suptitle_sfx = f"EVCS connected to {self.connection} point : rating {self.demand*24}W",
+    #         file_name_sfx = f"synth_net_evcs_{self.demand}kw_{self.connection}_ashik_data2", 
     #         fontsize=30,
     #         do_return=True
     #     )
@@ -591,51 +601,70 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     self.assertIsNotNone(ax)
     #     pass
     
-    def test_demand_dependence(self):
-        self.evcsdataID = 'existing'
-        self.area = 'Area 2'
+    # def test_demand_dependence(self):
+    #     # self.evcsdataID = 'existing'
+    #     self.area = 'Area 2'
         
+    #     # initial read
+    #     synth_net, evcs = self.read_inputs()
+    #     init_length = sum([synth_net.edges[e]["length"] \
+    #                         for e in synth_net.edges])
         
-        data_demand = {"demand":[], "length":[]}
-        lambda_ = 1000000
+    #     volt_range = [0.95, 0.92, 0.90]
+    #     data = {"rating":[], "connection":[], "length":[]}
+    #     data.update(
+    #         {f"less than {v}":[] for v in volt_range}
+    #         )
+    #     lambda_ = 1000000
+    #     rating_list = [1800, 2000, 2400, 3000, 3600, 4800]
         
-        for demand in tqdm(range(150,10500,150), 
-                      ncols=100, desc="simulate for multiple weights"):
-            self.demand = demand
-            synth_net, evcs = self.read_inputs()
-            init_length = sum([synth_net.edges[e]["length"] \
-                                for e in synth_net.edges])
-            synth_net = self.connect_evcs(
-                synth_net, evcs, 
-                connection='optimal',
-                lambda_ = lambda_, 
-                epsilon=1e-1,)
-            final_length = sum([synth_net.edges[e]["length"] \
-                                for e in synth_net.edges])
-            
-            # Evaluate the additional length
-            add_length = final_length - init_length
-            
-            # Add it to the data
-            data_demand["demand"].append(demand)
-            data_demand["length"].append(add_length)
+    #     for conn_type in ["optimal", "nearest"]:
         
-        # Create the dataframe
-        df = pd.DataFrame(data_demand)
-        df.to_csv(f"{self.out_dir}/demand_lamb_{lambda_}.csv", index=False)
+    #         for k in tqdm(range(len(rating_list)), 
+    #                       desc="Computing for different EV charger ratings",
+    #                       ncols=100):
+    #             self.demand = float(rating_list[k] / 24.0)
+                
+    #             # additional edges for routing
+    #             synth_net = self.connect_evcs(
+    #                 synth_net, evcs, 
+    #                 connection=conn_type,
+    #                 lambda_ = lambda_, 
+    #                 epsilon=1e-1,)
+    #             final_length = sum([synth_net.edges[e]["length"] \
+    #                                 for e in synth_net.edges])
+                
+    #             # Evaluate the additional length
+    #             add_length = final_length - init_length
+                
+    #             # Add it to the data
+    #             data["connection"].append(conn_type)
+    #             data["rating"].append(rating_list[k])
+    #             data["length"].append(add_length)
+                
+    #             # run powerflow and number of nodes outside limit
+    #             powerflow(synth_net)
+    #             nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
+    #             for v in volt_range:
+    #                 num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
+    #                 data[f"less than {v}"].append(num_nodes)
         
-        # Plot the dependence
-        fig, ax = self.plot_dependence(
-            df_data=df,
-            suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
-            file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
-            fontsize=20,
-            do_return=True
-        )
-        self.assertIsNotNone(fig)
-        self.assertIsNotNone(ax)
+    #     # Create the dataframe
+    #     df = pd.DataFrame(data)
+    #     df.to_csv(f"{self.out_dir}/demand_lamb_{lambda_}.csv", index=False)
         
-        pass
+    #     # Plot the dependence
+    #     fig, ax = self.plot_dependence(
+    #         df_data=df,
+    #         suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
+    #         file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
+    #         fontsize=20,
+    #         do_return=True
+    #     )
+    #     self.assertIsNotNone(fig)
+    #     self.assertIsNotNone(ax)
+        
+    #     pass
     
     # def test_plot_dependence(self):
     #     lambda_ = 1000000
@@ -718,12 +747,78 @@ class EVCSRuns_Montgomery(EVCSFixture):
     #     pass
 
 
-if __name__ == '__main__':
-    unittest.main()
+# if __name__ == '__main__':
+#     unittest.main()
 
 
 
 
+fx = EVCSFixture('runTest')
+fx.out_dir = "out/script"
+fx.fig_dir = "figs/script"
+fx.grb_dir = "gurobi/script"
+fx.area = 'Area 2'
+
+
+
+volt_range = [0.95, 0.92, 0.90]
+data = {"rating":[], "connection":[], "length":[]}
+data.update(
+    {f"less than {v}":[] for v in volt_range}
+    )
+lambda_ = 1000000
+rating_list = [1800, 2000, 2400, 3000, 3600, 4800]
+
+for conn_type in ["optimal", "nearest"]:
+
+    for k in tqdm(range(len(rating_list)), 
+                  desc="Computing for different EV charger ratings",
+                  ncols=100):
+        fx.demand = float(rating_list[k] / 24.0)
+        
+        # initial read
+        synth_net, evcs = fx.read_inputs()
+        init_length = sum([synth_net.edges[e]["length"] \
+                            for e in synth_net.edges])
+        
+        # additional edges for routing
+        synth_net = fx.connect_evcs(
+            synth_net, evcs, 
+            connection=conn_type,
+            lambda_ = lambda_, 
+            epsilon=1e-1,)
+        final_length = sum([synth_net.edges[e]["length"] \
+                            for e in synth_net.edges])
+        
+        # Evaluate the additional length
+        add_length = final_length - init_length
+        
+        # Add it to the data
+        data["connection"].append(conn_type)
+        data["rating"].append(rating_list[k])
+        data["length"].append(add_length)
+        
+        # run powerflow and number of nodes outside limit
+        powerflow(synth_net)
+        nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
+        for v in volt_range:
+            num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
+            data[f"less than {v}"].append(num_nodes)
+
+# Create the dataframe
+df = pd.DataFrame(data)
+df.to_csv(f"{fx.out_dir}/demand_lamb_{lambda_}.csv", index=False)
+
+# Plot the dependence
+fig, ax = fx.plot_dependence(
+    df_data=df,
+    suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
+    file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
+    fontsize=20,
+    do_return=True
+)
+fx.assertIsNotNone(fig)
+fx.assertIsNotNone(ax)
 
 
 
