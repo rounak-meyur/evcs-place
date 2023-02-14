@@ -73,6 +73,9 @@ class EVCSFixture(unittest.TestCase):
         self._fig_dir = "figs"
         self._grb_dir = "gurobi"
 
+        # multiplier for average hourly demand in a charging station in kW
+        self.demand = 3600.0 / 24.0
+
         self.evfilename = {
             'existing': 'ev-stations',
             'ashik-iter1': 'ev-stations-1'}
@@ -137,6 +140,29 @@ class EVCSFixture(unittest.TestCase):
 
         return synt_net
     
+    def read_ev_data(self, filename, hull=None):
+        if not filename.endswith(".csv"):
+            filename = f"{filename}.csv"
+        df = pd.read_csv(f"{self.evloc_path}/{filename}", header=0)
+
+        if hull:
+            fuel = [(df["x_station"][i],df["y_station"][i], df["client_count"][i]) \
+                    for i in range(len(df)) \
+                    if Point(df["x_station"][i],df["y_station"][i]).within(hull)]
+        else:
+            fuel = [(df["x_station"][i],df["y_station"][i], df["client_count"][i]) \
+                    for i in range(len(df))]
+        
+        # Rename the fuel station nodes
+        evcs_cord = {f'F{i+1}': (fuel[i][0],fuel[i][1]) \
+                     for i,data in enumerate(fuel)}
+        evcs_demand = {f'F{i+1}': fuel[i][-1] for i,data in enumerate(fuel)}
+
+        # Store data in named tuple
+        evcs = nt('EVCS', field_names=["cord","demand"])
+        evcs_data = evcs(cord=evcs_cord, demand=evcs_demand)
+        return evcs_data
+    
     def read_fuel_data(self, evcsdataID=None, hull=None):
         if not evcsdataID:
             evcsdataID = self.evcsdataID
@@ -179,7 +205,8 @@ class EVCSFixture(unittest.TestCase):
         hull = pt_nodes.convex_hull
         
         # Get the EVCS stations within the region
-        evcs = self.read_fuel_data(evcsdataID=evcsdataID, hull=hull)
+        # evcs = self.read_fuel_data(evcsdataID=evcsdataID, hull=hull)
+        evcs = self.read_ev_data("evcs_solution.csv", hull=hull)
         return evcs
     
     def read_inputs(self, area=None, hull=None, evcsdataID=None):

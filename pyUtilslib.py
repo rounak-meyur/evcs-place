@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from shapely.geometry import Point, LineString
 from geographiclib.geodesic import Geodesic
+import pickle
+from networkx.utils import open_file
+
+@open_file(0, mode='rb')
+def read_gpickle(path):
+    return pickle.load(path)
 
 def geodist(geomA,geomB):
     if type(geomA) != Point: geomA = Point(geomA)
@@ -45,7 +51,7 @@ def GetDistNet(path,code):
             net_file = f"{path}/{c}-dist-net.gpickle"
             if not os.path.exists(net_file):
                 raise ValueError(f"{net_file} doesn't exist!")
-            g = nx.read_gpickle(net_file)
+            g = read_gpickle(net_file)
             graph = nx.compose(graph,g)
             for n in graph:
                 graph.nodes[n]["reach"] = nx.shortest_path_length(
@@ -54,7 +60,7 @@ def GetDistNet(path,code):
         net_file = f"{path}/{code}-dist-net.gpickle"
         if not os.path.exists(net_file):
             raise ValueError(f"{net_file} doesn't exist!")
-        graph = nx.read_gpickle(net_file)
+        graph = read_gpickle(net_file)
         for n in graph:
             graph.nodes[n]["reach"] = nx.shortest_path_length(
                 graph, n, code, 'length')
@@ -123,7 +129,7 @@ def highlight_regions(geom_regions, ax,  **kwargs):
     # Transparency level
     alpha = kwargs.get('alpha', 0.2)
     
-    # region color and highlight color
+    ## region color and highlight color
     plot_colors = dict(
         region=kwargs.get('region_color', 'cyan'),
         highlight=kwargs.get('highlight_color', 'orange')
