@@ -15,6 +15,8 @@ import os
 import unittest
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+import itertools
 from timeit import default_timer as timer
 from tqdm import tqdm
 
@@ -428,7 +430,7 @@ class EVCSFixture(unittest.TestCase):
             **kwargs
             ):
         kwargs.setdefault('figsize', (10, 10))
-        fontsize = kwargs.get('fontsize', 20)
+        fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         if not area:
             area = self.area
@@ -439,16 +441,87 @@ class EVCSFixture(unittest.TestCase):
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
         
-        sns.lineplot(df_data, x="rating", y="length", hue="connection", 
-                     )
+        sns.barplot(df_data, x="rating", y="length", hue="connection",
+                    ax=ax)
         
         
-        # if cols[0] == 'rating':
-        #     ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
-        # elif cols[1] == 'lambda':
-        #     ax.set_xlabel("Weight factor in objective function", fontsize=fontsize)
         ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
         ax.set_ylabel("Additional length (in meters)", fontsize=fontsize)
+        ax.tick_params(axis='y',labelsize=30)
+        ax.tick_params(axis='x',labelsize=30,rotation=60)
+        
+        ax.legend(prop={'size': 30},loc='center left')
+        
+        # ---- Edit the title of the plot ----
+
+        if file_name_sfx := kwargs.get('file_name_sfx'):
+            if not to_file:
+                to_file = f"{area}"
+            to_file = f"{to_file}_{file_name_sfx}"
+
+        if no_ax:
+            to_file = f"{self.fig_dir}/{to_file}.png"
+            suptitle = f"${self.area}$"
+            if suptitle_sfx := kwargs.get('suptitle_sfx'):
+                suptitle = f"{suptitle} : {suptitle_sfx}"
+
+            fig.suptitle(suptitle, fontsize=fontsize+3)
+            close_fig(fig, to_file, show)
+
+        if do_return:
+            return fig, ax
+        pass
+    
+    def plot_improvement(
+            self, csv_file = None, df_data=None, area=None,
+            ax=None, to_file=None, show=True,
+            **kwargs
+            ):
+        
+        kwargs.setdefault('figsize', (10, 10))
+        fontsize = kwargs.get('fontsize', 30)
+        do_return = kwargs.get('do_return', False)
+        if not area:
+            area = self.area
+            
+        if csv_file:
+            df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
+        
+        cols = df_data.columns
+        groups = [x for x in cols if '<' in x]
+        num_stack = len(groups)
+        colors = sns.color_palette("Set3")[:num_stack]
+        ratings = df_data.rating.unique()
+
+        # ---- PLOT ----
+        fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
+        for i,g in enumerate(groups):
+            ax = sns.barplot(data=df_data, x="rating", y=g, hue="connection",
+                        palette=[colors[i]], ax=ax,
+                        zorder=i, edgecolor="k")
+        
+        
+        ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
+        ax.set_ylabel("Number of nodes", fontsize=fontsize)
+        ax.tick_params(axis='y',labelsize=30)
+        ax.tick_params(axis='x',labelsize=30,rotation=60)
+
+        hatches = itertools.cycle(['/', ''])
+        for i, bar in enumerate(ax.patches):
+            if i%(len(ratings)) == 0:
+                hatch = next(hatches)
+            bar.set_hatch(hatch)
+
+
+        han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
+                      for label, color in zip(groups, colors)]
+        han2 = [Patch(facecolor="white",edgecolor='black',
+                      label="optimal routing",hatch='/'),
+                       Patch(facecolor="white",edgecolor='black',
+                             label="nearest routing",hatch='')]
+        # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
+        ax.legend(handles=han1+han2,ncol=1,prop={'size': 20},loc='upper left')
+        # ax.add_artist(leg1)
         
         # ---- Edit the title of the plot ----
 
@@ -753,77 +826,80 @@ class EVCSFixture(unittest.TestCase):
 
 
 
-# fx = EVCSFixture('runTest')
-# fx.out_dir = "out/script"
-# fx.fig_dir = "figs/script"
-# fx.grb_dir = "gurobi/script"
-# fx.area = 'Area 2'
+fx = EVCSFixture('runTest')
+fx.out_dir = "out/script"
+fx.fig_dir = "figs/script"
+fx.grb_dir = "gurobi/script"
+fx.area = 'Area 2'
 
-# fx.plot_dependence(csv_file="demand_lamb_1000000.csv", 
-#                    suptitle_sfx = "additional length for routing power lines")
+fx.plot_dependence(csv_file="demand_lamb_1000000.csv", 
+                    suptitle_sfx = "additional length for routing power lines")
 
-# import sys
-# sys.exit(0)
+fx.plot_improvement(csv_file="demand_lamb_1000000.csv", 
+                    suptitle_sfx = "improvement in voltages")
+
+import sys
+sys.exit(0)
 
 
-# volt_range = [0.95, 0.92, 0.90]
-# data = {"rating":[], "connection":[], "length":[]}
-# data.update(
-#     {f"less than {v}":[] for v in volt_range}
-#     )
-# lambda_ = 1000000
-# rating_list = [30, 50, 100, 120, 150]
+volt_range = [0.97, 0.95, 0.92, 0.90]
+data = {"rating":[], "connection":[], "length":[]}
+data.update(
+    {f"< {v}":[] for v in volt_range}
+    )
+lambda_ = 1000000
+rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
 
-# for conn_type in ["optimal", "nearest"]:
+for conn_type in ["optimal", "nearest"]:
 
-#     for k in tqdm(range(len(rating_list)), 
-#                   desc="Computing for different EV charger ratings",
-#                   ncols=100):
-#         fx.demand = float(rating_list[k] / 24.0)
+    for k in tqdm(range(len(rating_list)), 
+                  desc="Computing for different EV charger ratings",
+                  ncols=100):
+        fx.demand = float(rating_list[k] * 1000 / 24.0)
         
-#         # initial read
-#         synth_net, evcs = fx.read_inputs()
-#         init_length = sum([synth_net.edges[e]["length"] \
-#                             for e in synth_net.edges])
+        # initial read
+        synth_net, evcs = fx.read_inputs()
+        init_length = sum([synth_net.edges[e]["length"] \
+                            for e in synth_net.edges])
         
-#         # additional edges for routing
-#         synth_net = fx.connect_evcs(
-#             synth_net, evcs, 
-#             connection=conn_type,
-#             lambda_ = lambda_, 
-#             epsilon=1e-1,)
-#         final_length = sum([synth_net.edges[e]["length"] \
-#                             for e in synth_net.edges])
+        # additional edges for routing
+        synth_net = fx.connect_evcs(
+            synth_net, evcs, 
+            connection=conn_type,
+            lambda_ = lambda_, 
+            epsilon=1e-1,)
+        final_length = sum([synth_net.edges[e]["length"] \
+                            for e in synth_net.edges])
         
-#         # Evaluate the additional length
-#         add_length = final_length - init_length
+        # Evaluate the additional length
+        add_length = final_length - init_length
         
-#         # Add it to the data
-#         data["connection"].append(conn_type)
-#         data["rating"].append(rating_list[k])
-#         data["length"].append(add_length)
+        # Add it to the data
+        data["connection"].append(conn_type)
+        data["rating"].append(rating_list[k])
+        data["length"].append(add_length)
         
-#         # run powerflow and number of nodes outside limit
-#         powerflow(synth_net)
-#         nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
-#         for v in volt_range:
-#             num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
-#             data[f"less than {v}"].append(num_nodes)
+        # run powerflow and number of nodes outside limit
+        powerflow(synth_net)
+        nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
+        for v in volt_range:
+            num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
+            data[f"< {v}"].append(num_nodes)
 
-# # Create the dataframe
-# df = pd.DataFrame(data)
-# df.to_csv(f"{fx.out_dir}/demand_lamb_{lambda_}.csv", index=False)
+# Create the dataframe
+df = pd.DataFrame(data)
+df.to_csv(f"{fx.out_dir}/demand_lamb_{lambda_}.csv", index=False)
 
-# # Plot the dependence
-# fig, ax = fx.plot_dependence(
-#     df_data=df,
-#     suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
-#     file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
-#     fontsize=20,
-#     do_return=True
-# )
-# fx.assertIsNotNone(fig)
-# fx.assertIsNotNone(ax)
+# Plot the dependence
+fig, ax = fx.plot_dependence(
+    df_data=df,
+    suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
+    file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
+    fontsize=20,
+    do_return=True
+)
+fx.assertIsNotNone(fig)
+fx.assertIsNotNone(ax)
 
 
 
