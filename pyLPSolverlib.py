@@ -10,7 +10,7 @@ import gurobipy as grb
 import numpy as np
 import scipy
 import networkx as nx
-# import cvxpy as cp
+import cvxpy as cp
 
 def mycallback(model, where):
     if where == grb.GRB.Callback.MIP:
@@ -193,74 +193,75 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
 
 
 
-# def get_optimal_routing(synt_net, candidate_edges, evcs, 
-#                         path, v0=1.0, lambda_=1e3):
-#     graph = construct_dummy(synt_net, candidate_edges, evcs)
-#     edgelist = list(graph.edges)
-#     nodelist = list(graph.nodes)
-#     n_edges = len(edgelist)
-#     n_nodes = len(nodelist)
+def cvxpy_solve(synt_net, candidate_edges, evcs, 
+                v0=1.0, lambda_=1e3, verbose=False):
+    
+    graph = construct_dummy(synt_net, candidate_edges, evcs)
+    edgelist = list(graph.edges)
+    nodelist = list(graph.nodes)
+    n_edges = len(edgelist)
+    n_nodes = len(nodelist)
     
     
-#     R = np.diag([graph.edges[e]['r'] for e in edgelist])
-#     A = nx.incidence_matrix(graph,nodelist=nodelist,
-#                             edgelist=edgelist,oriented=True)
-#     D = nx.incidence_matrix(graph,nodelist=nodelist,
-#                             edgelist=edgelist,oriented=False)
+    R = np.diag([graph.edges[e]['r'] for e in edgelist])
+    A = nx.incidence_matrix(graph,nodelist=nodelist,
+                            edgelist=edgelist,oriented=True)
+    D = nx.incidence_matrix(graph,nodelist=nodelist,
+                            edgelist=edgelist,oriented=False)
     
-#     p = np.array([graph.nodes[n]['load']*1e-3 for n in nodelist])
-#     l = np.array([graph.edges[e]['length'] for e in edgelist])
-#     fuel_ind = [i for i,n in enumerate(nodelist) if graph.nodes[n]['label']=='Y']
+    p = np.array([graph.nodes[n]['load']*1e-3 for n in nodelist])
+    l = np.array([graph.edges[e]['length'] for e in edgelist])
+    fuel_ind = [i for i,n in enumerate(nodelist) if graph.nodes[n]['label']=='Y']
     
-#     sublist = [n for n in synt_net if synt_net.nodes[n]['label']=='S']
-#     root_ind = [nodelist.index(s) for s in sublist]
-#     pred = np.delete(p,root_ind)
-#     Ared = np.delete(A.toarray(), root_ind, axis=0)
+    sublist = [n for n in synt_net if synt_net.nodes[n]['label']=='S']
+    root_ind = [nodelist.index(s) for s in sublist]
+    pred = np.delete(p,root_ind)
+    Ared = np.delete(A.toarray(), root_ind, axis=0)
     
     
-#     M = 2
-#     F = sum(pred)
+    M = 2
+    F = sum(pred)
     
-#     x = cp.Variable(n_edges, integer=True)
-#     f = cp.Variable(n_edges)
-#     v = cp.Variable(n_nodes)
+    x = cp.Variable(n_edges, boolean=True)
+    f = cp.Variable(n_edges)
+    v = cp.Variable(n_nodes)
 
-#     constraints = []
-#     # voltage constraint
-#     constraints.append((A.T @ v) - (R @ f) <= M * (1 - x))
-#     constraints.append((A.T @ v) - (R @ f) >= M * (x - 1))
+    constraints = []
+    # voltage constraint
+    # constraints.append((A.T @ v) - (R @ f) <= M * (1 - x))
+    # constraints.append((A.T @ v) - (R @ f) >= M * (x - 1))
     
-#     for ind in root_ind:
-#         constraints.append(v[ind] == v0)
-    
-    
-#     constraints.append((Ared @ f) == -pred)
-#     constraints.append(f <= F * x)
-#     constraints.append(f >= -F * x)
-    
-#     # Fuel node degree
-#     constraints.append( (D[fuel_ind,:] @ x) == 1 )
+    for ind in root_ind:
+        constraints.append(v[ind] == v0)
     
     
-#     constraints.append(cp.sum(x) == n_nodes-1)
-#     for i,e in enumerate(edgelist):
-#         if e in synt_net.edges:
-#             constraints.append( (x[i] == 1) )
+    constraints.append((Ared @ f) == -pred)
+    constraints.append(f <= F * x)
+    constraints.append(f >= -F * x)
     
-#     # Objective function
-#     objective = cp.Minimize(1e-3 * (l @ x) + (lambda_ * cp.sum_squares( 1 - v )))
+    # Fuel node degree
+    constraints.append( (D[fuel_ind,:] @ x) == 1 )
     
-#     # Solve model and capture solution information
-#     prob = cp.Problem(objective, constraints)
-#     prob.solve()
     
-#     # get the solution
-#     x_optimal = x.value
-#     optimal_edges = [e for i,e in enumerate(edgelist) if x_optimal[i]>0.8]
-#     # get new edges
-#     new_edges = [e for e in optimal_edges \
-#                     if e in candidate_edges or (e[1],e[0]) in candidate_edges]
-#     return new_edges
+    constraints.append(cp.sum(x) == n_nodes-1)
+    for i,e in enumerate(edgelist):
+        if e in synt_net.edges:
+            constraints.append( (x[i] == 1) )
+    
+    # Objective function
+    objective = cp.Minimize(1e-3 * (l @ x) + (lambda_ * cp.sum_squares( 1 - v )))
+    
+    # Solve model and capture solution information
+    prob = cp.Problem(objective, constraints)
+    prob.solve(verbose=verbose)
+    
+    # get the solution
+    x_optimal = x.value
+    optimal_edges = [e for i,e in enumerate(edgelist) if x_optimal[i]>0.8]
+    # get new edges
+    new_edges = [e for e in optimal_edges \
+                    if e in candidate_edges or (e[1],e[0]) in candidate_edges]
+    return new_edges
     
 
 

@@ -29,7 +29,7 @@ import seaborn as sns
 
 from pyUtilslib import GetDistNet, geodist, powerflow
 from pyUtilslib import plot_network, highlight_regions
-from pyLPSolverlib import get_optimal_routing
+from pyLPSolverlib import get_optimal_routing, cvxpy_solve
 
 
 
@@ -236,7 +236,10 @@ class EVCSFixture(unittest.TestCase):
         return add_edges
     
     @staticmethod
-    def connect_optimal_road(net, points, path, epsilon=5e-3, lambda_=1e3):
+    def connect_optimal_road(
+        net, points, path, 
+        epsilon=5e-3, lambda_=1e3, 
+        solver="gurobi", verbose=False):
         # Get candidate edges
         candidates = []
         distance = []
@@ -248,8 +251,13 @@ class EVCSFixture(unittest.TestCase):
             distance.extend([geodist(p_cord,net.nodes[r]['cord']) for r in near_road])
         
         # Solve optimization problem to get the best candidate
-        add_edges = get_optimal_routing(
-            net, dict(zip(candidates,distance)), points, path, lambda_=lambda_)
+        if solver == "gurobi":
+            add_edges = get_optimal_routing(
+                net, dict(zip(candidates,distance)), points, path, lambda_=lambda_)
+        else:
+            add_edges = cvxpy_solve(
+                net, dict(zip(candidates,distance)), points, 
+                lambda_=lambda_, verbose=verbose)
         return add_edges
     
     @staticmethod
@@ -294,13 +302,17 @@ class EVCSFixture(unittest.TestCase):
         
         eps = kwargs.get("epsilon", 5e-3)
         lambda_ = kwargs.get("lambda_", 1e3)
+        solver = kwargs.get("solver", "gurobi")
+        verbose = kwargs.get("verbose", False)
         
         if connection == "nearest":
             new_edges = self.connect_nearest_road(synth_net, evcs, epsilon=eps)
         
         elif connection == "optimal":
             new_edges = self.connect_optimal_road(
-                synth_net, evcs, self.grb_dir, epsilon=eps, lambda_=lambda_)
+                synth_net, evcs, self.grb_dir, 
+                epsilon=eps, lambda_=lambda_, 
+                solver=solver, verbose=verbose)
             
         else:
             raise ValueError(f"{connection} is invalid connection algorithm specifier")
@@ -424,12 +436,12 @@ class EVCSFixture(unittest.TestCase):
             return fig, ax
         pass
     
-    def plot_dependence(
+    def plot_investment(
             self, csv_file = None, df_data=None, area=None,
             ax=None, to_file=None, show=True,
             **kwargs
             ):
-        kwargs.setdefault('figsize', (10, 10))
+        kwargs.setdefault('figsize', (15, 15))
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         if not area:
@@ -441,16 +453,20 @@ class EVCSFixture(unittest.TestCase):
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
         
-        sns.barplot(df_data, x="rating", y="length", hue="connection",
+        # investment computation
+        cost = 180 / 1609.34
+        df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
+
+        sns.barplot(df_data, x="rating", y="cost", hue="connection",
                     ax=ax)
         
         
-        ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
-        ax.set_ylabel("Additional length (in meters)", fontsize=fontsize)
+        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        ax.set_ylabel("Investment for new lines (K$)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=60)
         
-        ax.legend(prop={'size': 30},loc='center left')
+        ax.legend(prop={'size': 30},loc='upper left',ncol=2)
         
         # ---- Edit the title of the plot ----
 
@@ -478,7 +494,7 @@ class EVCSFixture(unittest.TestCase):
             **kwargs
             ):
         
-        kwargs.setdefault('figsize', (10, 10))
+        kwargs.setdefault('figsize', (15, 15))
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         if not area:
@@ -501,7 +517,7 @@ class EVCSFixture(unittest.TestCase):
                         zorder=i, edgecolor="k")
         
         
-        ax.set_xlabel("EV charger rating (Watts)", fontsize=fontsize)
+        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
         ax.set_ylabel("Number of nodes", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=60)
@@ -832,11 +848,29 @@ fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
 fx.area = 'Area 2'
 
-fx.plot_dependence(csv_file="demand_lamb_1000000.csv", 
-                    suptitle_sfx = "additional length for routing power lines")
 
-fx.plot_improvement(csv_file="demand_lamb_1000000.csv", 
-                    suptitle_sfx = "improvement in voltages")
+fx.demand = float(30 * 1000 / 24.0)
+        
+# initial read
+synth_net, evcs = fx.read_inputs()
+
+# additional edges for routing
+synth_net = fx.connect_evcs(
+    synth_net, evcs, 
+    connection="optimal",
+    lambda_ = 1e6, 
+    epsilon=1e-1,
+    solver="gurobi", verbose=True)
+
+# fx.plot_investment(csv_file="demand_lamb_1000000.csv", 
+#                     suptitle_sfx = "investment for routing power lines", 
+#                     to_file=f"{fx.area}-investment", 
+#                     show=False, fontsize=35)
+
+# fx.plot_improvement(csv_file="demand_lamb_1000000.csv", 
+#                     suptitle_sfx = "improvement in voltages", 
+#                     to_file=f"{fx.area}-improvement", 
+#                     show=False, fontsize=35)
 
 import sys
 sys.exit(0)
@@ -884,7 +918,7 @@ for conn_type in ["optimal", "nearest"]:
         nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
         for v in volt_range:
             num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
-            data[f"< {v}"].append(num_nodes)
+            data[f"< {v}"].append(num_nodes * 100.0 / len(nodelist))
 
 # Create the dataframe
 df = pd.DataFrame(data)
