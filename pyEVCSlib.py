@@ -31,7 +31,9 @@ from pyUtilslib import GetDistNet, geodist, powerflow
 from pyUtilslib import plot_network, highlight_regions
 from pyLPSolverlib import get_optimal_routing, cvxpy_solve
 
-
+sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
+       150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
+       150727, 150728]
 
 def get_fig_from_ax(ax, figsize, **kwargs):
     if not ax:
@@ -82,9 +84,7 @@ class EVCSFixture(unittest.TestCase):
         self.evfilename = {
             'existing': 'ev-stations',
             'ashik-iter1': 'ev-stations-1'}
-        self.area_codes = {
-            'Area 1': 121144,
-            'Area 2': 150692}
+        self.area_codes = {f'Area {i+1}': s for i,s in enumerate(sublist)}
         pass
     
     # Out directory setter/ if not, create a directory
@@ -838,143 +838,3 @@ class EVCSFixture(unittest.TestCase):
 
 # if __name__ == '__main__':
 #     unittest.main()
-
-
-
-
-fx = EVCSFixture('runTest')
-fx.out_dir = "out/script"
-fx.fig_dir = "figs/script"
-fx.grb_dir = "gurobi/script"
-fx.area = 'Area 2'
-
-
-fx.demand = float(30 * 1000 / 24.0)
-        
-# initial read
-synth_net, evcs = fx.read_inputs()
-
-# additional edges for routing
-synth_net = fx.connect_evcs(
-    synth_net, evcs, 
-    connection="optimal",
-    lambda_ = 1e6, 
-    epsilon=1e-1,
-    solver="gurobi", verbose=True)
-
-# fx.plot_investment(csv_file="demand_lamb_1000000.csv", 
-#                     suptitle_sfx = "investment for routing power lines", 
-#                     to_file=f"{fx.area}-investment", 
-#                     show=False, fontsize=35)
-
-# fx.plot_improvement(csv_file="demand_lamb_1000000.csv", 
-#                     suptitle_sfx = "improvement in voltages", 
-#                     to_file=f"{fx.area}-improvement", 
-#                     show=False, fontsize=35)
-
-import sys
-sys.exit(0)
-
-
-volt_range = [0.97, 0.95, 0.92, 0.90]
-data = {"rating":[], "connection":[], "length":[]}
-data.update(
-    {f"< {v}":[] for v in volt_range}
-    )
-lambda_ = 1000000
-rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
-
-for conn_type in ["optimal", "nearest"]:
-
-    for k in tqdm(range(len(rating_list)), 
-                  desc="Computing for different EV charger ratings",
-                  ncols=100):
-        fx.demand = float(rating_list[k] * 1000 / 24.0)
-        
-        # initial read
-        synth_net, evcs = fx.read_inputs()
-        init_length = sum([synth_net.edges[e]["length"] \
-                            for e in synth_net.edges])
-        
-        # additional edges for routing
-        synth_net = fx.connect_evcs(
-            synth_net, evcs, 
-            connection=conn_type,
-            lambda_ = lambda_, 
-            epsilon=1e-1,)
-        final_length = sum([synth_net.edges[e]["length"] \
-                            for e in synth_net.edges])
-        
-        # Evaluate the additional length
-        add_length = final_length - init_length
-        
-        # Add it to the data
-        data["connection"].append(conn_type)
-        data["rating"].append(rating_list[k])
-        data["length"].append(add_length)
-        
-        # run powerflow and number of nodes outside limit
-        powerflow(synth_net)
-        nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
-        for v in volt_range:
-            num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
-            data[f"< {v}"].append(num_nodes * 100.0 / len(nodelist))
-
-# Create the dataframe
-df = pd.DataFrame(data)
-df.to_csv(f"{fx.out_dir}/demand_lamb_{lambda_}.csv", index=False)
-
-# Plot the dependence
-fig, ax = fx.plot_dependence(
-    df_data=df,
-    suptitle_sfx = f"Additional network length versus demand : lambda = {lambda_}",
-    file_name_sfx = f"demand_dependence_lamb_{lambda_}", 
-    fontsize=20,
-    do_return=True
-)
-fx.assertIsNotNone(fig)
-fx.assertIsNotNone(ax)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
