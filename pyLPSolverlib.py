@@ -228,8 +228,8 @@ def cvxpy_solve(synt_net, candidate_edges, evcs,
 
     constraints = []
     # voltage constraint
-    # constraints.append((A.T @ v) - (R @ f) <= M * (1 - x))
-    # constraints.append((A.T @ v) - (R @ f) >= M * (x - 1))
+    constraints.append((A.T @ v) - (R @ f) <= M * (1 - x))
+    constraints.append((A.T @ v) - (R @ f) >= M * (x - 1))
     
     for ind in root_ind:
         constraints.append(v[ind] == v0)
