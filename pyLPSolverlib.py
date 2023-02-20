@@ -174,15 +174,15 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     model._vars = model.getVars()
     
     # Solve model and capture solution information
-    # model.optimize(mycallback)
-    model.optimize()
+    model.optimize(mycallback)
+    # model.optimize()
     
     # Close log file
     logfile.close()
     
     if model.SolCount == 0:
         print(f'No solution found, optimization status = {model.Status}')
-        sys.exit(0)
+        return []
     else:
         x_optimal = x.getAttr("x").tolist()
         optimal_edges = [e for i,e in enumerate(edgelist) if x_optimal[i]>0.8]

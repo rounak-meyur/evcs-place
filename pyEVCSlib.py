@@ -318,8 +318,11 @@ class EVCSFixture(unittest.TestCase):
             raise ValueError(f"{connection} is invalid connection algorithm specifier")
         
         # Add the attributes
-        self.add_attributes(synth_net, new_edges, evcs)
-        return synth_net
+        if new_edges == []:
+            return synth_net, 0
+        else:
+            self.add_attributes(synth_net, new_edges, evcs)
+            return synth_net, 1
     
     def compute_powerflow(self, net):
         # Run power flow for the network
@@ -514,6 +517,79 @@ class EVCSFixture(unittest.TestCase):
         for i,g in enumerate(groups):
             ax = sns.barplot(data=df_data, x="rating", y=g, hue="connection",
                         palette=[colors[i]], ax=ax,
+                        zorder=i, edgecolor="k")
+        
+        
+        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        ax.set_ylabel("Number of nodes", fontsize=fontsize)
+        ax.tick_params(axis='y',labelsize=30)
+        ax.tick_params(axis='x',labelsize=30,rotation=60)
+
+        hatches = itertools.cycle(['/', ''])
+        for i, bar in enumerate(ax.patches):
+            if i%(len(ratings)) == 0:
+                hatch = next(hatches)
+            bar.set_hatch(hatch)
+
+
+        han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
+                      for label, color in zip(groups, colors)]
+        han2 = [Patch(facecolor="white",edgecolor='black',
+                      label="optimal routing",hatch='/'),
+                       Patch(facecolor="white",edgecolor='black',
+                             label="nearest routing",hatch='')]
+        # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
+        ax.legend(handles=han1+han2,ncol=1,prop={'size': 20},loc='upper left')
+        # ax.add_artist(leg1)
+        
+        # ---- Edit the title of the plot ----
+
+        if file_name_sfx := kwargs.get('file_name_sfx'):
+            if not to_file:
+                to_file = f"{area}"
+            to_file = f"{to_file}_{file_name_sfx}"
+
+        if no_ax:
+            to_file = f"{self.fig_dir}/{to_file}.png"
+            suptitle = f"${self.area}$"
+            if suptitle_sfx := kwargs.get('suptitle_sfx'):
+                suptitle = f"{suptitle} : {suptitle_sfx}"
+
+            fig.suptitle(suptitle, fontsize=fontsize+3)
+            close_fig(fig, to_file, show)
+
+        if do_return:
+            return fig, ax
+        pass
+    
+    def plot_tradeoff(
+            self, csv_file = None, df_data=None, area=None,
+            ax=None, to_file=None, show=True,
+            **kwargs
+            ):
+        
+        kwargs.setdefault('figsize', (15, 15))
+        fontsize = kwargs.get('fontsize', 30)
+        do_return = kwargs.get('do_return', False)
+        if not area:
+            area = self.area
+            
+        if csv_file:
+            df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
+            
+        # Filter out only data corresponding to optimal routing
+        df_data = df_data.iloc[df_data["connection"]=="optimal"]
+        
+        groups = [x for x in df_data.columns if '<' in x]
+        num_stack = len(groups)
+        colors = sns.color_palette("Set3")[:num_stack]
+        ratings = df_data.rating.unique()
+
+        # ---- PLOT ----
+        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1,2), **kwargs)
+        for i,g in enumerate(groups):
+            sns.barplot(data=df_data, x="rating", y=g, hue="lambda",
+                        palette=[colors[i]], ax=axs[1],
                         zorder=i, edgecolor="k")
         
         
