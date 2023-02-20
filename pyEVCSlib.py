@@ -461,7 +461,8 @@ class EVCSFixture(unittest.TestCase):
         df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
 
         sns.barplot(df_data, x="rating", y="cost", hue="connection",
-                    ax=ax)
+                    ax=ax, palette=sns.color_palette("Set2"), 
+                    edgecolor="k", ci=None)
         
         
         ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
@@ -480,7 +481,7 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"${self.area}$"
+            suptitle = f"{self.area}"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
@@ -506,8 +507,8 @@ class EVCSFixture(unittest.TestCase):
         if csv_file:
             df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
         
-        cols = df_data.columns
-        groups = [x for x in cols if '<' in x]
+        groups_string = [f"voltage {x} pu" for x in df_data.columns if '<' in x]
+        groups = [x for x in df_data.columns if '<' in x]
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
         ratings = df_data.rating.unique()
@@ -517,11 +518,11 @@ class EVCSFixture(unittest.TestCase):
         for i,g in enumerate(groups):
             ax = sns.barplot(data=df_data, x="rating", y=g, hue="connection",
                         palette=[colors[i]], ax=ax,
-                        zorder=i, edgecolor="k")
+                        zorder=i, edgecolor="k", ci=None)
         
         
         ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
-        ax.set_ylabel("Number of nodes", fontsize=fontsize)
+        ax.set_ylabel("Nodes having low voltage (%)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=60)
 
@@ -533,13 +534,13 @@ class EVCSFixture(unittest.TestCase):
 
 
         han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
-                      for label, color in zip(groups, colors)]
+                      for label, color in zip(groups_string, colors)]
         han2 = [Patch(facecolor="white",edgecolor='black',
-                      label="optimal routing",hatch='/'),
+                      label="nearest routing",hatch='/'),
                        Patch(facecolor="white",edgecolor='black',
-                             label="nearest routing",hatch='')]
+                             label="optimal routing",hatch='')]
         # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
-        ax.legend(handles=han1+han2,ncol=1,prop={'size': 20},loc='upper left')
+        ax.legend(handles=han1+han2,ncol=1,prop={'size': 30},loc='upper left')
         # ax.add_artist(leg1)
         
         # ---- Edit the title of the plot ----
@@ -551,7 +552,7 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"${self.area}$"
+            suptitle = f"{self.area}"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
@@ -568,7 +569,7 @@ class EVCSFixture(unittest.TestCase):
             **kwargs
             ):
         
-        kwargs.setdefault('figsize', (15, 15))
+        kwargs.setdefault('figsize', (32, 15))
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
         if not area:
@@ -578,8 +579,9 @@ class EVCSFixture(unittest.TestCase):
             df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
             
         # Filter out only data corresponding to optimal routing
-        df_data = df_data.iloc[df_data["connection"]=="optimal"]
-        
+        df_data = df_data.loc[df_data["connection"]=="optimal"]
+
+        groups_string = [f"voltage {x} pu" for x in df_data.columns if '<' in x]
         groups = [x for x in df_data.columns if '<' in x]
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
@@ -587,32 +589,66 @@ class EVCSFixture(unittest.TestCase):
 
         # ---- PLOT ----
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1,2), **kwargs)
+
+        # investment plots
+        cost = 180 / 1609.34
+        df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
+
+        lambdas = [f"${{\\lambda=10^{{-6}}}}$", f"${{\\lambda=1}}$", f"${{\\lambda=10^{{6}}}}$"]
+
+        sns.barplot(df_data, x="rating", y="cost", hue="lambda",
+                    ax=axs[0], color="white", 
+                    edgecolor="k", ci=None)
+        
+        
+        axs[0].set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        axs[0].set_ylabel("Investment for new lines (K$)", fontsize=fontsize)
+        axs[0].tick_params(axis='y',labelsize=30)
+        axs[0].tick_params(axis='x',labelsize=30,rotation=60)
+
+        hatches = itertools.cycle(['/', '*', 'o'])
+        for i, bar in enumerate(axs[0].patches):
+            if i%(len(ratings)) == 0:
+                hatch = next(hatches)
+            bar.set_hatch(hatch)
+
+        han2 = [Patch(facecolor="white",edgecolor='black',
+                      label=f"${{\\lambda=10^{{-6}}}}$",hatch='/'),
+                Patch(facecolor="white",edgecolor='black',
+                        label=f"${{\\lambda}}=1$",hatch='*'), 
+                Patch(facecolor="white",edgecolor='black',
+                        label=f"${{\\lambda=10^6}}$",hatch='o')]
+        axs[0].legend(handles=han2, prop={'size': 30}, loc='upper left', ncol=3)
+        
+        # reliability plots
         for i,g in enumerate(groups):
             sns.barplot(data=df_data, x="rating", y=g, hue="lambda",
                         palette=[colors[i]], ax=axs[1],
                         zorder=i, edgecolor="k")
         
         
-        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
-        ax.set_ylabel("Number of nodes", fontsize=fontsize)
-        ax.tick_params(axis='y',labelsize=30)
-        ax.tick_params(axis='x',labelsize=30,rotation=60)
+        axs[1].set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        axs[1].set_ylabel("Nodes having low voltage (%)", fontsize=fontsize)
+        axs[1].tick_params(axis='y',labelsize=30)
+        axs[1].tick_params(axis='x',labelsize=30,rotation=60)
 
-        hatches = itertools.cycle(['/', ''])
-        for i, bar in enumerate(ax.patches):
+        hatches = itertools.cycle(['/', '*', 'o'])
+        for i, bar in enumerate(axs[1].patches):
             if i%(len(ratings)) == 0:
                 hatch = next(hatches)
             bar.set_hatch(hatch)
 
 
         han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
-                      for label, color in zip(groups, colors)]
+                      for label, color in zip(groups_string, colors)]
         han2 = [Patch(facecolor="white",edgecolor='black',
-                      label="optimal routing",hatch='/'),
-                       Patch(facecolor="white",edgecolor='black',
-                             label="nearest routing",hatch='')]
+                      label=f"${{\\lambda=10^{{-6}}}}$",hatch='/'),
+                Patch(facecolor="white",edgecolor='black',
+                        label=f"${{\\lambda}}=1$",hatch='*'), 
+                Patch(facecolor="white",edgecolor='black',
+                        label=f"${{\\lambda=10^6}}$",hatch='o')]
         # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
-        ax.legend(handles=han1+han2,ncol=1,prop={'size': 20},loc='upper left')
+        axs[1].legend(handles=han1+han2,ncol=1,prop={'size': 30},loc='upper left')
         # ax.add_artist(leg1)
         
         # ---- Edit the title of the plot ----
@@ -624,7 +660,7 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"${self.area}$"
+            suptitle = f"{self.area}"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
