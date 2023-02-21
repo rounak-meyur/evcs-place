@@ -118,7 +118,7 @@ def get_optimal_routing(synt_net, candidate_edges, evcs,
     v = model.addMVar(
         n_nodes, 
         vtype=grb.GRB.CONTINUOUS, 
-        lb=0.9, ub=1.0, 
+        lb=0.85, ub=1.0, 
         name='v')
     
     w = model.addMVar(

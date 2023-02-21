@@ -20,11 +20,11 @@ fx.grb_dir = "gurobi/script"
 volt_range = [0.97, 0.95, 0.92, 0.90]
 lambda_list = [1e-6, 1, 1e6]
 rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
-area_list = ['Area 1', 'Area 3', 'Area 4', 'Area 6', 'Area 7', 'Area 8', 
-             'Area 9', 'Area 10', 'Area 11', 'Area 12', 'Area 13', 'Area 14', 
-             'Area 15', 'Area 16', 'Area 17', 'Area 18', 'Area 19', 'Area 20']
+# area_list = ['Area 1', 'Area 3', 'Area 4', 'Area 6', 'Area 7', 'Area 8', 
+#              'Area 9', 'Area 10', 'Area 11', 'Area 12', 'Area 13', 'Area 14', 
+#              'Area 15', 'Area 16', 'Area 17', 'Area 18', 'Area 19', 'Area 20']
         
-
+area_list = ['Area 1', 'Area 4', 'Area 8', 'Area 11', 'Area 12', 'Area 15']
 
 
 for area in area_list[11:]:
