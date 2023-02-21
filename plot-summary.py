@@ -8,7 +8,7 @@ fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
 
 
-for area in [3, 6, 7, 9, 13, 14, 16, 17, 18, 19]:
+for area in [3, 6, 7, 9, 13, 14, 16, 17, 18, 19, 20]:
     fx.area = f'Area {area}'
 
     fx.plot_investment(csv_file=f"{fx.area}_summary.csv", 
