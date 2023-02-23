@@ -9,6 +9,29 @@ fx.out_dir = "out/script"
 fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
 
+def update_data(data_dict, net, flag, v_range, length):
+    if flag:
+        final_length = sum([net.edges[e]["length"] \
+                            for e in net.edges])
+        
+        # Evaluate the additional length
+        add_length = final_length - length
+    
+        # Add it to the data
+        data_dict["length"].append(add_length)
+    
+        # run powerflow and number of nodes outside limit
+        powerflow(net)
+        nodelist = [n for n in net if net.nodes[n]['label']!='R']
+        for v in v_range:
+            num_nodes = len([n for n in nodelist if net.nodes[n]["voltage"] < v])
+            data_dict[f"< {v}"].append(num_nodes * 100.0 / len(nodelist))
+    else:
+        data_dict["length"].append(float("nan"))
+        for v in v_range:
+            data_dict[f"< {v}"].append(float("nan"))
+    return
+
 
 # area_list = []
 # for i in range(20):
@@ -21,6 +44,7 @@ fx.grb_dir = "gurobi/script"
 volt_range = [0.97, 0.95, 0.92, 0.90]
 lambda_list = [1e-6, 1, 1e6]
 rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
+conn_list = ["nearest", "optimal"]
 # area_list = ['Area 1', 'Area 3', 'Area 4', 'Area 6', 'Area 7', 'Area 8', 
 #              'Area 9', 'Area 10', 'Area 11', 'Area 12', 'Area 13', 'Area 14', 
 #              'Area 15', 'Area 16', 'Area 17', 'Area 18', 'Area 19', 'Area 20']
@@ -40,44 +64,28 @@ for area in area_list:
         data = {"lambda":[], "rating":[], "connection":[], "length":[]}
         data.update({f"< {v}":[] for v in volt_range})
     
-    # nearest available point algorithm
-    for rating in rating_list:
-        fx.demand = float(rating * 1000 / 24.0)
-        data["lambda"].append(1)
-        data["connection"].append("nearest")
-        data["rating"].append(rating)
+    # Loop over connection type
+    for conn_type in conn_list:
+        if conn_type == "nearest":
+            # nearest available point algorithm
+            for rating in rating_list:
+                fx.demand = float(rating * 1000 / 24.0)
+                data["lambda"].append(1)
+                data["connection"].append("nearest")
+                data["rating"].append(rating)
+                
+                # initial read
+                synth_net, evcs = fx.read_inputs()
+                init_length = sum([synth_net.edges[e]["length"] \
+                                    for e in synth_net.edges])
+                
+                # additional edges for nearest point routing
+                synth_net,opt_flag = fx.connect_evcs(
+                    synth_net, evcs, 
+                    connection="nearest",
+                    epsilon=1e-1,)
         
-        # initial read
-        synth_net, evcs = fx.read_inputs()
-        init_length = sum([synth_net.edges[e]["length"] \
-                            for e in synth_net.edges])
         
-        # additional edges for nearest point routing
-        synth_net,opt_flag = fx.connect_evcs(
-            synth_net, evcs, 
-            connection="nearest",
-            epsilon=1e-1,)
-        
-        if opt_flag:
-            final_length = sum([synth_net.edges[e]["length"] \
-                                for e in synth_net.edges])
-            
-            # Evaluate the additional length
-            add_length = final_length - init_length
-        
-            # Add it to the data
-            data["length"].append(add_length)
-        
-            # run powerflow and number of nodes outside limit
-            powerflow(synth_net)
-            nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
-            for v in volt_range:
-                num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
-                data[f"< {v}"].append(num_nodes * 100.0 / len(nodelist))
-        else:
-            data["length"].append(float("nan"))
-            for v in volt_range:
-                data[f"< {v}"].append(float("nan"))
     
     
     # optimal routing algorithm
@@ -103,26 +111,7 @@ for area in area_list:
                 lambda_ = lambda_, 
                 epsilon=1e-1,)
             
-            if opt_flag:
-                final_length = sum([synth_net.edges[e]["length"] \
-                                    for e in synth_net.edges])
-                
-                # Evaluate the additional length
-                add_length = final_length - init_length
             
-                # Add it to the data
-                data["length"].append(add_length)
-            
-                # run powerflow and number of nodes outside limit
-                powerflow(synth_net)
-                nodelist = [n for n in synth_net if synth_net.nodes[n]['label']!='R']
-                for v in volt_range:
-                    num_nodes = len([n for n in nodelist if synth_net.nodes[n]["voltage"] < v])
-                    data[f"< {v}"].append(num_nodes * 100.0 / len(nodelist))
-            else:
-                data["length"].append(float("nan"))
-                for v in volt_range:
-                    data[f"< {v}"].append(float("nan"))
     
     # Create the dataframe
     df = pd.DataFrame(data)
