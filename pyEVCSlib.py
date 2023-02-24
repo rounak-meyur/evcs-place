@@ -382,6 +382,7 @@ class EVCSFixture(unittest.TestCase):
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
         plot_network(synth_net, ax, **kwargs)
+        plt.box(False)
         
         # ---- Edit the title of the plot ----
 
