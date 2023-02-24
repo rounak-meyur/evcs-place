@@ -392,7 +392,7 @@ class EVCSFixture(unittest.TestCase):
 
         if no_ax:
             to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"${self.area}$"
+            suptitle = f"{self.area}"
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
