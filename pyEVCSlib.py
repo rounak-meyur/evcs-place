@@ -79,7 +79,7 @@ class EVCSFixture(unittest.TestCase):
         self._grb_dir = "gurobi"
 
         # multiplier for average hourly demand in a charging station in kW
-        self.demand = 3600.0 / 24.0
+        self.demand = 30000.0 / 24.0
 
         self.evfilename = {
             'existing': 'ev-stations',
@@ -294,7 +294,9 @@ class EVCSFixture(unittest.TestCase):
         return
     
     def connect_evcs(self, synth_net, evcs, 
-                     connection = "nearest", **kwargs):
+                     connection = "nearest", 
+                     df_data = None,
+                     **kwargs):
         # Check if EVCS exists
         if len(evcs.cord)==0:
             print("No EV charging station exists within region")
@@ -323,6 +325,7 @@ class EVCSFixture(unittest.TestCase):
         else:
             self.add_attributes(synth_net, new_edges, evcs)
             return synth_net, 1
+            
     
     def compute_powerflow(self, net):
         # Run power flow for the network

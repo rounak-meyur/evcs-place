@@ -30,7 +30,7 @@ def update_data(data_dict, net, flag, v_range, length):
         data_dict["length"].append(float("nan"))
         for v in v_range:
             data_dict[f"< {v}"].append(float("nan"))
-    return
+    return data_dict
 
 
 # area_list = []
@@ -49,8 +49,11 @@ conn_list = ["nearest", "optimal"]
 #              'Area 9', 'Area 10', 'Area 11', 'Area 12', 'Area 13', 'Area 14', 
 #              'Area 15', 'Area 16', 'Area 17', 'Area 18', 'Area 19', 'Area 20']
         
-area_list = ['Area 1', 'Area 4', 'Area 8', 'Area 11', 'Area 12', 'Area 15']
+# area_list = ['Area 1', 'Area 4', 'Area 8', 'Area 11', 'Area 12', 'Area 15']
 area_list = ['Area 6']
+lambda_list = [10, 100, 1000, 10000, 100000]
+rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
+conn_list = ["optimal"]
 
 for area in area_list:
     fx.area = area
@@ -58,8 +61,7 @@ for area in area_list:
     filename = f"{fx.out_dir}/{fx.area}_summary.csv"
     if os.path.exists(filename):
         df = pd.read_csv(filename, header=0)
-        data = df.to_dict()
-        sys.exit(0)
+        data = df.to_dict(orient='list')
     else:
         data = {"lambda":[], "rating":[], "connection":[], "length":[]}
         data.update({f"< {v}":[] for v in volt_range})
@@ -84,6 +86,10 @@ for area in area_list:
                     synth_net, evcs, 
                     connection="nearest",
                     epsilon=1e-1,)
+                
+                # update data dict
+                data = update_data(data, synth_net, opt_flag, 
+                                   volt_range, init_length)
         
         
     
@@ -110,6 +116,10 @@ for area in area_list:
                 connection="optimal",
                 lambda_ = lambda_, 
                 epsilon=1e-1,)
+            
+            # update data dict
+            data = update_data(data, synth_net, opt_flag, 
+                               volt_range, init_length)
             
             
     
