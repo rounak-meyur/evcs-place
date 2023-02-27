@@ -483,7 +483,7 @@ class EVCSFixture(unittest.TestCase):
                     edgecolor="k", ci=None)
         
         
-        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        ax.set_xlabel("EV adoption (%)", fontsize=fontsize)
         ax.set_ylabel("Investment for new lines (1000$)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=60)
@@ -633,7 +633,7 @@ class EVCSFixture(unittest.TestCase):
                     edgecolor="k", ci=None)
         
         
-        axs[0].set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        axs[0].set_xlabel("EV adoption (%)", fontsize=fontsize)
         axs[0].set_ylabel("Investment for new lines (1000$)", fontsize=fontsize)
         axs[0].tick_params(axis='y',labelsize=30)
         axs[0].tick_params(axis='x',labelsize=30,rotation=60)
