@@ -1,4 +1,4 @@
-
+import sys
 from pyEVCSlib import EVCSFixture
 
 
@@ -7,8 +7,10 @@ fx.out_dir = "out/script"
 fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
 
+arealist = [3, 6, 7, 9, 13, 14, 16, 17, 18, 19, 20]
+arealist = [6]
 
-for area in [3, 6, 7, 9, 13, 14, 16, 17, 18, 19, 20]:
+for area in arealist:
     fx.area = f'Area {area}'
 
     fx.plot_investment(csv_file=f"{fx.area}_summary.csv", 
@@ -21,7 +23,8 @@ for area in [3, 6, 7, 9, 13, 14, 16, 17, 18, 19, 20]:
                         to_file=f"{fx.area}-improvement", 
                         show=False, fontsize=35)
 
-    fx.plot_tradeoff1(csv_file=f"{fx.area}_summary.csv", 
-                        suptitle_sfx = "Investment to reliability trade off", 
-                        to_file=f"{fx.area}-tradeoff", 
-                        show=False, fontsize=35)
+    fx.plot_tradeoff(csv_file=f"{fx.area}_summary.csv", 
+                    suptitle_sfx = "Investment to reliability trade off", 
+                    to_file=f"{fx.area}-tradeoff", 
+                    show=False, fontsize=35, tick_fontsize=28, 
+                    linewidth=3, markersize=20)

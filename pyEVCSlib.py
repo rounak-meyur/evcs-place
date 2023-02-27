@@ -16,6 +16,7 @@ import unittest
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 import itertools
 from timeit import default_timer as timer
 from tqdm import tqdm
@@ -34,6 +35,17 @@ from pyLPSolverlib import get_optimal_routing, cvxpy_solve
 sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
        150727, 150728]
+
+adoption = {
+    30: 10, 
+    50: 15, 
+    100: 30, 
+    120: 35, 
+    150: 40, 
+    180: 50, 
+    250: 70, 
+    350: 100
+}
 
 def get_fig_from_ax(ax, figsize, **kwargs):
     if not ax:
@@ -464,7 +476,9 @@ class EVCSFixture(unittest.TestCase):
         cost = 180 / 1609.34
         df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
 
-        sns.barplot(df_data, x="rating", y="cost", hue="connection",
+        df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
+
+        sns.barplot(df_data, x="adoption", y="cost", hue="connection",
                     ax=ax, palette=sns.color_palette("Set2"), 
                     edgecolor="k", ci=None)
         
@@ -521,24 +535,26 @@ class EVCSFixture(unittest.TestCase):
         groups = [x for x in df_data.columns if '<' in x]
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
-        ratings = df_data.rating.unique()
+        df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
+        adoptions = df_data.adoption.unique()
+        # ratings = df_data.rating.unique()
 
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
         for i,g in enumerate(groups):
-            ax = sns.barplot(data=df_data, x="rating", y=g, hue="connection",
+            ax = sns.barplot(data=df_data, x="adoption", y=g, hue="connection",
                         palette=[colors[i]], ax=ax,
                         zorder=i, edgecolor="k", ci=None)
         
         
-        ax.set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
+        ax.set_xlabel("EV adoption (%)", fontsize=fontsize)
         ax.set_ylabel("Nodes having low voltage (%)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=60)
 
         hatches = itertools.cycle(['/', ''])
         for i, bar in enumerate(ax.patches):
-            if i%(len(ratings)) == 0:
+            if i%(len(adoptions)) == 0:
                 hatch = next(hatches)
             bar.set_hatch(hatch)
 
@@ -692,8 +708,11 @@ class EVCSFixture(unittest.TestCase):
             ax=None, to_file=None, show=True,
             **kwargs,
             ):
-        kwargs.setdefault('figsize', (32, 15))
+        kwargs.setdefault('figsize', (42, 15))
+        linewidth = kwargs.get("linewidth", 1)
+        markersize = kwargs.get("markersize", 500)
         fontsize = kwargs.get('fontsize', 30)
+        tickfontsize = kwargs.get('tick_fontsize', 30)
         do_return = kwargs.get('do_return', False)
         if not area:
             area = self.area
@@ -705,8 +724,38 @@ class EVCSFixture(unittest.TestCase):
         df_data = df_data.loc[df_data["connection"]=="optimal"]
         
         # ---- PLOT ----
-        fig, axs, no_ax = get_fig_from_ax(ax, **kwargs)
-        
+        vrange = [0.92, 0.95, 0.97]
+        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1,len(vrange)), **kwargs)
+
+        # Line plot of undervoltage nodes to investment
+        cost = 180 / 1609.34
+        df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
+        df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
+
+
+        adoptions = df_data.adoption.unique()
+        colors = sns.color_palette("Set2")
+
+        for i,vr in enumerate(vrange):
+            sns.lineplot(
+                data = df_data, x = "cost", y = f"< {vr}", 
+                hue = "adoption", style = "adoption",
+                ax=axs[i], palette=colors, 
+                markers = True, 
+                lw=linewidth, ms=markersize, 
+                )
+            
+            axs[i].set_xlabel("Investment on additional lines (1000 $)", fontsize=fontsize)
+            axs[i].set_ylabel("Percentage of undervoltage nodes", fontsize=fontsize)
+            axs[i].set_title(f"Reliable voltage limit : {vr} p.u.", fontsize=fontsize)
+            axs[i].tick_params(axis='y',labelsize=tickfontsize)
+            axs[i].tick_params(axis='x',labelsize=tickfontsize,rotation=60)
+
+            axs[i].legend(handles=axs[i].get_legend().legendHandles, 
+                          labels = [f"{r} %" for r in adoptions], 
+                          ncol=1,fontsize=fontsize-5,loc='upper right', 
+                          markerscale=3, 
+                          title=f"% EV adoption", title_fontsize=fontsize)
         
         
         # ---- Edit the title of the plot ----
