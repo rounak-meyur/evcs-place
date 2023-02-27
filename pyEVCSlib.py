@@ -511,7 +511,13 @@ class EVCSFixture(unittest.TestCase):
         if csv_file:
             df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
         
-        groups_string = [f"voltage {x} pu" for x in df_data.columns if '<' in x]
+        groups_string = []
+        vrange = sorted([float(x.lstrip("< ")) for x in df_data.columns if '<' in x])[::-1]
+        for k in range(len(vrange)):
+            if k != len(vrange) - 1:
+                groups_string.append(f"{vrange[k+1]} - {vrange[k]} pu")
+            else:
+                groups_string.append(f"< {vrange[k]}")
         groups = [x for x in df_data.columns if '<' in x]
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
@@ -567,7 +573,7 @@ class EVCSFixture(unittest.TestCase):
             return fig, ax
         pass
     
-    def plot_tradeoff(
+    def plot_tradeoff1(
             self, csv_file = None, df_data=None, area=None,
             ax=None, to_file=None, show=True,
             **kwargs
@@ -585,7 +591,13 @@ class EVCSFixture(unittest.TestCase):
         # Filter out only data corresponding to optimal routing
         df_data = df_data.loc[df_data["connection"]=="optimal"]
 
-        groups_string = [f"voltage {x} pu" for x in df_data.columns if '<' in x]
+        groups_string = []
+        vrange = sorted([float(x.lstrip("< ")) for x in df_data.columns if '<' in x])[::-1]
+        for k in range(len(vrange)):
+            if k != len(vrange) - 1:
+                groups_string.append(f"{vrange[k+1]:0.2f} - {vrange[k]:0.2f} pu")
+            else:
+                groups_string.append(f"< {vrange[k]:0.2f}")
         groups = [x for x in df_data.columns if '<' in x]
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
@@ -654,6 +666,48 @@ class EVCSFixture(unittest.TestCase):
         # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
         axs[1].legend(handles=han1+han2,ncol=1,prop={'size': 30},loc='upper left')
         # ax.add_artist(leg1)
+        
+        # ---- Edit the title of the plot ----
+
+        if file_name_sfx := kwargs.get('file_name_sfx'):
+            if not to_file:
+                to_file = f"{area}"
+            to_file = f"{to_file}_{file_name_sfx}"
+
+        if no_ax:
+            to_file = f"{self.fig_dir}/{to_file}.png"
+            suptitle = f"{self.area}"
+            if suptitle_sfx := kwargs.get('suptitle_sfx'):
+                suptitle = f"{suptitle} : {suptitle_sfx}"
+
+            fig.suptitle(suptitle, fontsize=fontsize+3)
+            close_fig(fig, to_file, show)
+
+        if do_return:
+            return fig, ax
+        pass
+    
+    def plot_tradeoff(
+            self, csv_file = None, df_data=None, area=None,
+            ax=None, to_file=None, show=True,
+            **kwargs,
+            ):
+        kwargs.setdefault('figsize', (32, 15))
+        fontsize = kwargs.get('fontsize', 30)
+        do_return = kwargs.get('do_return', False)
+        if not area:
+            area = self.area
+            
+        if csv_file:
+            df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
+            
+        # Filter out only data corresponding to optimal routing
+        df_data = df_data.loc[df_data["connection"]=="optimal"]
+        
+        # ---- PLOT ----
+        fig, axs, no_ax = get_fig_from_ax(ax, **kwargs)
+        
+        
         
         # ---- Edit the title of the plot ----
 
