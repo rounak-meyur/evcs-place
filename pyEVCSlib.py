@@ -344,41 +344,6 @@ class EVCSFixture(unittest.TestCase):
         powerflow(net)
         return
     
-    # def plot_voltage(self,net,ax):
-    #     color_ = {"E":"blue", "P":"black", "S":"red", "L":"peru"}
-    #     v_nodes = {n:net.nodes[n]["voltage"] for n in net}
-    #     for edge in net.edges:
-    #         ax.plot([d_nodes[edge[0]],d_nodes[edge[1]]],
-    #                   [v_nodes[edge[0]],v_nodes[edge[1]]],
-    #                   color=color_[net.edges[edge]["label"]])
-    
-    
-    # def plot_voltage_comparison(
-    #         self, net, demand,
-    #         ax=None, to_file=None, show=True,
-    #         **kwargs
-    #         ):
-        
-    #     # ---- Arguments ----
-    #     fontsize = kwargs.get('fontsize', 25)
-    #     do_return = kwargs.get('do_return', False)
-    #     figsize = kwargs.get('figsize', (20, 10))
-    #     fig, axs, no_ax = get_fig_from_ax(ax, figsize, ndim=(1, 2))
-
-    #     # ---- PLOT ----
-    #     compute_powerflow(net)
-        
-    #     # ---- Save plot figure ----
-    #     if no_ax:
-    #         to_file = f"{self.fig_dir}/{to_file}.png"
-    #         if kwargs.get('suptitle_sfx'):
-    #             suptitle = f"{kwargs.get('suptitle_sfx')}"
-    #             fig.suptitle(suptitle,fontsize=fontsize)
-    #         close_fig(fig, to_file, show, bbox_inches='tight')
-
-    #     if do_return:
-    #         return fig, axs
-    #     pass
     
     def plot_synth_net(
             self, synth_net, area=None,
@@ -458,11 +423,13 @@ class EVCSFixture(unittest.TestCase):
     def plot_investment(
             self, csv_file = None, df_data=None, area=None,
             ax=None, to_file=None, show=True,
+            adoptions=None,
             **kwargs
             ):
         kwargs.setdefault('figsize', (15, 15))
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
+        label_rotation = kwargs.get('label_rotation', 0)
         if not area:
             area = self.area
             
@@ -475,18 +442,22 @@ class EVCSFixture(unittest.TestCase):
         # investment computation
         cost = 180 / 1609.34
         df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
-
         df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
+
+        if not adoptions:
+            adoptions = df_data.adoption.unique()
+        else:
+            df_data = df_data.loc[df_data["adoption"].isin(adoptions)]
 
         sns.barplot(df_data, x="adoption", y="cost", hue="connection",
                     ax=ax, palette=sns.color_palette("Set2"), 
                     edgecolor="k", ci=None)
         
         
-        ax.set_xlabel("EV adoption (%)", fontsize=fontsize)
-        ax.set_ylabel("Investment for new lines (1000$)", fontsize=fontsize)
+        ax.set_xlabel("Percentage EV adoption (%)", fontsize=fontsize)
+        ax.set_ylabel("Investment on new lines (1000$)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
-        ax.tick_params(axis='x',labelsize=30,rotation=60)
+        ax.tick_params(axis='x',labelsize=30,rotation=label_rotation)
         
         ax.legend(prop={'size': 30},loc='upper left',ncol=2)
         
@@ -513,12 +484,14 @@ class EVCSFixture(unittest.TestCase):
     def plot_improvement(
             self, csv_file = None, df_data=None, area=None,
             ax=None, to_file=None, show=True,
+            adoptions=None,
             **kwargs
             ):
         
         kwargs.setdefault('figsize', (15, 15))
         fontsize = kwargs.get('fontsize', 30)
         do_return = kwargs.get('do_return', False)
+        label_rotation = kwargs.get('label_rotation', 0)
         if not area:
             area = self.area
             
@@ -536,8 +509,11 @@ class EVCSFixture(unittest.TestCase):
         num_stack = len(groups)
         colors = sns.color_palette("Set3")[:num_stack]
         df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
-        adoptions = df_data.adoption.unique()
-        # ratings = df_data.rating.unique()
+        
+        if not adoptions:
+            adoptions = df_data.adoption.unique()
+        else:
+            df_data = df_data.loc[df_data["adoption"].isin(adoptions)]
 
         # ---- PLOT ----
         fig, ax, no_ax = get_fig_from_ax(ax, **kwargs)
@@ -547,10 +523,10 @@ class EVCSFixture(unittest.TestCase):
                         zorder=i, edgecolor="k", ci=None)
         
         
-        ax.set_xlabel("EV adoption (%)", fontsize=fontsize)
-        ax.set_ylabel("Nodes having low voltage (%)", fontsize=fontsize)
+        ax.set_xlabel("Percentage EV adoption (%)", fontsize=fontsize)
+        ax.set_ylabel("Percentage of nodes within voltage range (%)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
-        ax.tick_params(axis='x',labelsize=30,rotation=60)
+        ax.tick_params(axis='x',labelsize=30,rotation=label_rotation)
 
         hatches = itertools.cycle(['/', ''])
         for i, bar in enumerate(ax.patches):
@@ -589,123 +565,10 @@ class EVCSFixture(unittest.TestCase):
             return fig, ax
         pass
     
-    def plot_tradeoff1(
-            self, csv_file = None, df_data=None, area=None,
-            ax=None, to_file=None, show=True,
-            **kwargs
-            ):
-        
-        kwargs.setdefault('figsize', (32, 15))
-        fontsize = kwargs.get('fontsize', 30)
-        do_return = kwargs.get('do_return', False)
-        if not area:
-            area = self.area
-            
-        if csv_file:
-            df_data = pd.read_csv(f"{self.out_dir}/{csv_file}")
-            
-        # Filter out only data corresponding to optimal routing
-        df_data = df_data.loc[df_data["connection"]=="optimal"]
-
-        groups_string = []
-        vrange = sorted([float(x.lstrip("< ")) for x in df_data.columns if '<' in x])[::-1]
-        for k in range(len(vrange)):
-            if k != len(vrange) - 1:
-                groups_string.append(f"{vrange[k+1]:0.2f} - {vrange[k]:0.2f} pu")
-            else:
-                groups_string.append(f"< {vrange[k]:0.2f}")
-        groups = [x for x in df_data.columns if '<' in x]
-        num_stack = len(groups)
-        colors = sns.color_palette("Set3")[:num_stack]
-        ratings = df_data.rating.unique()
-
-        # ---- PLOT ----
-        fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1,2), **kwargs)
-
-        # investment plots
-        cost = 180 / 1609.34
-        df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
-
-        lambdas = [f"${{\\lambda=10^{{-6}}}}$", f"${{\\lambda=1}}$", f"${{\\lambda=10^{{6}}}}$"]
-
-        sns.barplot(df_data, x="rating", y="cost", hue="lambda",
-                    ax=axs[0], color="white", 
-                    edgecolor="k", ci=None)
-        
-        
-        axs[0].set_xlabel("EV adoption (%)", fontsize=fontsize)
-        axs[0].set_ylabel("Investment for new lines (1000$)", fontsize=fontsize)
-        axs[0].tick_params(axis='y',labelsize=30)
-        axs[0].tick_params(axis='x',labelsize=30,rotation=60)
-
-        hatches = itertools.cycle(['/', '*', 'o'])
-        for i, bar in enumerate(axs[0].patches):
-            if i%(len(ratings)) == 0:
-                hatch = next(hatches)
-            bar.set_hatch(hatch)
-
-        han2 = [Patch(facecolor="white",edgecolor='black',
-                      label=f"${{\\lambda=10^{{-6}}}}$",hatch='/'),
-                Patch(facecolor="white",edgecolor='black',
-                        label=f"${{\\lambda}}=1$",hatch='*'), 
-                Patch(facecolor="white",edgecolor='black',
-                        label=f"${{\\lambda=10^6}}$",hatch='o')]
-        axs[0].legend(handles=han2, prop={'size': 30}, loc='upper left', ncol=3)
-        
-        # reliability plots
-        for i,g in enumerate(groups):
-            sns.barplot(data=df_data, x="rating", y=g, hue="lambda",
-                        palette=[colors[i]], ax=axs[1],
-                        zorder=i, edgecolor="k")
-        
-        
-        axs[1].set_xlabel("EV fast charger rating (kW)", fontsize=fontsize)
-        axs[1].set_ylabel("Nodes having low voltage (%)", fontsize=fontsize)
-        axs[1].tick_params(axis='y',labelsize=30)
-        axs[1].tick_params(axis='x',labelsize=30,rotation=60)
-
-        hatches = itertools.cycle(['/', '*', 'o'])
-        for i, bar in enumerate(axs[1].patches):
-            if i%(len(ratings)) == 0:
-                hatch = next(hatches)
-            bar.set_hatch(hatch)
-
-
-        han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
-                      for label, color in zip(groups_string, colors)]
-        han2 = [Patch(facecolor="white",edgecolor='black',
-                      label=f"${{\\lambda=10^{{-6}}}}$",hatch='/'),
-                Patch(facecolor="white",edgecolor='black',
-                        label=f"${{\\lambda}}=1$",hatch='*'), 
-                Patch(facecolor="white",edgecolor='black',
-                        label=f"${{\\lambda=10^6}}$",hatch='o')]
-        # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
-        axs[1].legend(handles=han1+han2,ncol=1,prop={'size': 30},loc='upper left')
-        # ax.add_artist(leg1)
-        
-        # ---- Edit the title of the plot ----
-
-        if file_name_sfx := kwargs.get('file_name_sfx'):
-            if not to_file:
-                to_file = f"{area}"
-            to_file = f"{to_file}_{file_name_sfx}"
-
-        if no_ax:
-            to_file = f"{self.fig_dir}/{to_file}.png"
-            suptitle = f"{self.area}"
-            if suptitle_sfx := kwargs.get('suptitle_sfx'):
-                suptitle = f"{suptitle} : {suptitle_sfx}"
-
-            fig.suptitle(suptitle, fontsize=fontsize+3)
-            close_fig(fig, to_file, show)
-
-        if do_return:
-            return fig, ax
-        pass
-    
     def plot_tradeoff(
             self, csv_file = None, df_data=None, area=None,
             ax=None, to_file=None, show=True,
+            adoptions = None,
             **kwargs,
             ):
         kwargs.setdefault('figsize', (42, 15))
@@ -714,6 +577,7 @@ class EVCSFixture(unittest.TestCase):
         fontsize = kwargs.get('fontsize', 30)
         tickfontsize = kwargs.get('tick_fontsize', 30)
         do_return = kwargs.get('do_return', False)
+        label_rotation = kwargs.get('label_rotation', 0)
         if not area:
             area = self.area
             
@@ -732,8 +596,11 @@ class EVCSFixture(unittest.TestCase):
         df_data['cost'] = df_data['length'].apply(lambda x: x*cost)
         df_data['adoption'] = df_data['rating'].apply(lambda x: adoption[x])
 
-
-        adoptions = df_data.adoption.unique()
+        if not adoptions:
+            adoptions = df_data.adoption.unique()
+        else:
+            df_data = df_data.loc[df_data["adoption"].isin(adoptions)]
+        
         colors = sns.color_palette("Set2")
 
         for i,vr in enumerate(vrange):
@@ -745,17 +612,17 @@ class EVCSFixture(unittest.TestCase):
                 lw=linewidth, ms=markersize, 
                 )
             
-            axs[i].set_xlabel("Investment on additional lines (1000 $)", fontsize=fontsize)
-            axs[i].set_ylabel("Percentage of undervoltage nodes", fontsize=fontsize)
+            axs[i].set_xlabel("Investment on new lines (1000 $)", fontsize=fontsize)
+            axs[i].set_ylabel("Percentage of undervoltage nodes (%)", fontsize=fontsize)
             axs[i].set_title(f"Reliable voltage limit : {vr} p.u.", fontsize=fontsize)
             axs[i].tick_params(axis='y',labelsize=tickfontsize)
-            axs[i].tick_params(axis='x',labelsize=tickfontsize,rotation=60)
+            axs[i].tick_params(axis='x',labelsize=tickfontsize,rotation=label_rotation)
 
             axs[i].legend(handles=axs[i].get_legend().legendHandles, 
                           labels = [f"{r} %" for r in adoptions], 
-                          ncol=1,fontsize=fontsize-5,loc='upper right', 
+                          ncol=1,fontsize=fontsize,loc='upper right', 
                           markerscale=3, 
-                          title=f"% EV adoption", title_fontsize=fontsize)
+                          title=f"Percentage \n EV adoption", title_fontsize=fontsize)
         
         
         # ---- Edit the title of the plot ----
@@ -771,7 +638,7 @@ class EVCSFixture(unittest.TestCase):
             if suptitle_sfx := kwargs.get('suptitle_sfx'):
                 suptitle = f"{suptitle} : {suptitle_sfx}"
 
-            fig.suptitle(suptitle, fontsize=fontsize+3)
+            fig.suptitle(suptitle, fontsize=fontsize+8)
             close_fig(fig, to_file, show)
 
         if do_return:
