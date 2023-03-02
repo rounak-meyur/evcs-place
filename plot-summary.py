@@ -31,5 +31,5 @@ for area in arealist:
                     suptitle_sfx = "Investment to reliability trade off", 
                     to_file=f"{fx.area}-tradeoff", 
                     show=False, fontsize=37, tick_fontsize=28, 
-                    linewidth=3, markersize=20, 
+                    linewidth=10, markersize=40, 
                     adoptions=adopt)
