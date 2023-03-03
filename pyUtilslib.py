@@ -194,9 +194,13 @@ def plot_network(net, ax, **kwargs):
             Line2D([0], [0], color='white', markerfacecolor='peru', 
                marker='o',markersize=20,label="EV charging station")
             )
+        leghands.insert(2,
+            Line2D([0], [0], color='peru', markerfacecolor='peru', 
+               marker='o',markersize=0,label='EVCS connection')
+            )
     
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
-    ax.legend(handles=leghands,loc='best',ncol=1,
+    ax.legend(handles=leghands,loc='best',ncol=2,
               fontsize=fontsize)
     return
 
