@@ -150,18 +150,29 @@ def highlight_regions(geom_regions, ax,  **kwargs):
 def plot_network(net, ax, **kwargs):
     """
     """
+    sub_size = kwargs.get("substation_size", 2000)
+    tsf_size = kwargs.get("transformer_size", 70)
+    road_size = kwargs.get("roadnode_size", 1)
+    ev_size = kwargs.get("evcs_size", 700)
+    res_size = kwargs.get("home_size", 30)
+    primnet_wdth = kwargs.get("primnet_width", 2)
+    hvnet_wdth = kwargs.get("hvnet_width", 2)
+    secnet_wdth = kwargs.get("secnet_width", 1)
+    evnet_wdth = kwargs.get("evcs_conn_width", 3)
+    fontsize = kwargs.get("fontsize", 30)
+    
     # Draw nodes
-    DrawNodes(net,ax,label='S',color='dodgerblue',size=2000)
-    DrawNodes(net,ax,label='T',color='green',size=25)
-    DrawNodes(net,ax,label='R',color='black',size=2.0)
-    DrawNodes(net,ax,label='E',color='peru',size=300.0)
-    DrawNodes(net,ax,label='H',color='crimson',size=2.0)
+    DrawNodes(net,ax,label='S',color='dodgerblue',size=sub_size)
+    DrawNodes(net,ax,label='T',color='green',size=tsf_size)
+    DrawNodes(net,ax,label='R',color='black',size=road_size)
+    DrawNodes(net,ax,label='E',color='peru',size=ev_size)
+    DrawNodes(net,ax,label='H',color='crimson',size=res_size)
     
     # Draw edges
-    DrawEdges(net,ax,label='P',color='black',width=2.0)
-    DrawEdges(net,ax,label='E',color='dodgerblue',width=2.0)
-    DrawEdges(net,ax,label='L',color='peru',width=1.8)
-    DrawEdges(net,ax,label='S',color='crimson',width=1.0)
+    DrawEdges(net,ax,label='P',color='black',width=primnet_wdth)
+    DrawEdges(net,ax,label='E',color='dodgerblue',width=hvnet_wdth)
+    DrawEdges(net,ax,label='L',color='peru',width=evnet_wdth)
+    DrawEdges(net,ax,label='S',color='crimson',width=secnet_wdth)
     
     # Legend for the plot
     leghands = [Line2D([0], [0], color='black', markerfacecolor='black', 
@@ -185,7 +196,8 @@ def plot_network(net, ax, **kwargs):
             )
     
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
-    ax.legend(handles=leghands,loc='best',ncol=1,prop={'size': 25})
+    ax.legend(handles=leghands,loc='best',ncol=1,
+              fontsize=fontsize)
     return
 
 
