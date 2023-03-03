@@ -4,7 +4,7 @@ fx = EVCSFixture('runTest')
 fx.out_dir = "out/script"
 fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
-fx.area = 'Area 9'
+fx.area = 'Area 6'
 
 
 fx.demand = float(30 * 1000 / 24.0)
