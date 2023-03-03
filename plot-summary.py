@@ -8,7 +8,7 @@ fx.fig_dir = "figs/script"
 fx.grb_dir = "gurobi/script"
 
 arealist = [3, 6, 7, 9, 13, 14, 16, 17, 18, 19, 20]
-arealist = [6]
+arealist = [6, 9]
 
 adopt = [10, 40, 70, 100]
 
