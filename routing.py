@@ -50,7 +50,7 @@ conn_list = ["nearest", "optimal"]
 #              'Area 15', 'Area 16', 'Area 17', 'Area 18', 'Area 19', 'Area 20']
         
 # area_list = ['Area 1', 'Area 4', 'Area 8', 'Area 11', 'Area 12', 'Area 15']
-area_list = ['Area 6']
+area_list = ['Area 9']
 lambda_list = [10, 100, 1000, 10000, 100000]
 rating_list = [30, 50, 100, 120, 150, 180, 250, 350]
 conn_list = ["optimal"]
