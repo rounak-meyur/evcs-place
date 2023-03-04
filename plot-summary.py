@@ -19,7 +19,8 @@ for area in arealist:
                         suptitle_sfx = "Investment for routing power lines", 
                         to_file=f"{fx.area}-investment", 
                         show=False, fontsize=35, 
-                        adoptions=adopt, 
+                        adoptions=adopt,
+                        figsize=(15,8),
                         )
 
     fx.plot_improvement(csv_file=f"{fx.area}_summary.csv", 
@@ -27,6 +28,7 @@ for area in arealist:
                         to_file=f"{fx.area}-improvement", 
                         show=False, fontsize=35, 
                         adoptions=adopt,
+                        figsize=(15,8),
                         )
 
     fx.plot_tradeoff(csv_file=f"{fx.area}_summary.csv", 
