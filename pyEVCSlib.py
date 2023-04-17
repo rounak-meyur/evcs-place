@@ -459,7 +459,7 @@ class EVCSFixture(unittest.TestCase):
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=label_rotation)
         
-        ax.legend(prop={'size': 30},loc='upper left',ncol=2)
+        ax.legend(fontsize=fontsize,loc='upper left',ncol=2)
         
         # ---- Edit the title of the plot ----
 
@@ -524,7 +524,7 @@ class EVCSFixture(unittest.TestCase):
         
         
         ax.set_xlabel("Percentage EV adoption (%)", fontsize=fontsize)
-        ax.set_ylabel("Percentage of nodes within voltage range (%)", fontsize=fontsize)
+        ax.set_ylabel("Nodes within voltage range (%)", fontsize=fontsize)
         ax.tick_params(axis='y',labelsize=30)
         ax.tick_params(axis='x',labelsize=30,rotation=label_rotation)
 
@@ -542,7 +542,7 @@ class EVCSFixture(unittest.TestCase):
                        Patch(facecolor="white",edgecolor='black',
                              label="optimal routing",hatch='')]
         # leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 50},loc='center right')
-        ax.legend(handles=han1+han2,ncol=1,prop={'size': 30},loc='upper left')
+        ax.legend(handles=han1+han2,ncol=1,fontsize=fontsize,loc='upper left')
         # ax.add_artist(leg1)
         
         # ---- Edit the title of the plot ----

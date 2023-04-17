@@ -15,7 +15,8 @@ synth_net, evcs = fx.read_inputs()
 fx.plot_synth_net(synth_net, 
                   suptitle_sfx = "Synthetic distribution network",
                   to_file = f"{fx.area}_synthetic_net", 
-                  show = True, fontsize=38, 
+                  show = True, fontsize=20,
+                  figsize=(24,12),
                   )
 for conn in ["nearest", "optimal"]:
     synth_net, evcs = fx.read_inputs()
@@ -34,6 +35,7 @@ for conn in ["nearest", "optimal"]:
     fx.plot_synth_net(synth_net, 
                       suptitle_sfx = f"{conn.title()} routing of EVCS : additional length = {int(add)} meters",
                       to_file = f"{fx.area}_evcs_{conn}_connection", 
-                      show = True, fontsize=38,
+                      show = True, fontsize=20,
+                      figsize=(24,12),
                       evcs_conn_width = 5.0
                       )
