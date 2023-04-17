@@ -589,6 +589,7 @@ class EVCSFixture(unittest.TestCase):
         
         # ---- PLOT ----
         vrange = [0.92, 0.95, 0.97]
+        ylim = [0.45, 4.05, 40.05]
         fig, axs, no_ax = get_fig_from_ax(ax, ndim=(1,len(vrange)), **kwargs)
 
         # Line plot of undervoltage nodes to investment
@@ -617,6 +618,8 @@ class EVCSFixture(unittest.TestCase):
             axs[i].set_title(f"Reliable voltage limit : {vr} p.u.", fontsize=fontsize)
             axs[i].tick_params(axis='y',labelsize=tickfontsize)
             axs[i].tick_params(axis='x',labelsize=tickfontsize,rotation=label_rotation)
+
+            axs[i].set_ylim(-0.05, ylim[i])
 
             axs[i].legend(handles=axs[i].get_legend().legendHandles, 
                           labels = [f"{r} %" for r in adoptions], 
